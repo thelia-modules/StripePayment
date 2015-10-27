@@ -1,0 +1,9 @@
+{intl l="Dear customer," d="stripepayment.email.default"}
+
+{intl l="This is a confirmation of the payment of your order %order on %name." order={$order_ref} name={$store_name} d="stripepayment.email.default"}
+
+{intl l="Your invoice is now available in your customer account on %site" site={$store_url} d="stripepayment.email.default"}
+
+{intl l="Thank you again for your purchase." d="stripepayment.email.default"}
+
+{intl l="The %name team." name={$store_name} d="stripepayment.email.default"}

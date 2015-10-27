@@ -1,0 +1,14 @@
+config:
+  enabled:
+    type: checkbox
+    label: Activated ?
+    help: Do you want to activate Stripe Payment
+  secret_key:
+    type: text
+    required: true
+    label: Your secret key
+    help: You can see all your keys in your Stripe dashboard. Also note that you can place your test or your live API keys
+  publishable_key:
+    type: text
+    required: true
+    label: Your publishable key (test or live)

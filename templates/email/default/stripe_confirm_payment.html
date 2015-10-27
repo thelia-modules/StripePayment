@@ -1,0 +1,34 @@
+{extends file="email-layout.tpl"}
+
+{* Open in browser  *}
+{block name="browser"}{/block}
+
+{* No big image header *}
+{block name="image-header"}{/block}
+
+{* No pre-header *}
+{block name="pre-header"}{/block}
+
+{* Subject  *}
+{block name="email-subject"}Payment confirmation {$store_name}{/block}
+
+{* Title  *}
+{block name="email-title"}{/block}
+
+{* Content  *}
+{block name="email-content"}
+    <h1 id="logotexte">{$store_name}</h1>
+
+    <h2 id="info">{intl l="Payment is confirmed for your order" d="stripepayment.email.default"}</h2>
+
+    <h3 id="commande">{intl l="Reference %ref" ref={$order_ref} d="stripepayment.email.default"}</h3>
+
+    <p id="liencompte">
+        {intl l="Your invoice is now available in your customer account on" d="stripepayment.email.default"}
+        <a href="{$store_url}">{$store_name}</a>.
+    </p>
+
+    <p>{intl l="Thank you for your order!" d="stripepayment.email.default"}</p>
+
+    <p>{intl l="The %name team." name={$store_name} d="stripepayment.email.default"}</p>
+{/block}

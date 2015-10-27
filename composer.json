@@ -1,0 +1,12 @@
+{
+  "name": "thelia/stripe-payment-module",
+  "license": "LGPL-3.0+",
+  "type": "thelia-module",
+  "require": {
+    "thelia/installer": "~1.1",
+    "stripe/stripe-php": "3.*"
+  },
+  "extra": {
+    "installer-name": "StripePayment"
+  }
+}

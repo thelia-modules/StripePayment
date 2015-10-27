@@ -1,0 +1,53 @@
+<script>
+
+    // Stripe handler
+    var handler = StripeCheckout.configure({
+        key: '{$public_key}',
+        locale: 'auto',
+        token: function(token) {
+            // When Stripe card form is submitted, get Stripe token
+            $("#stripe_token").val(token.id);
+
+            // Submit invoice form
+            $("#form-cart-payment").submit();
+        }
+    });
+
+    // When payment form is submitted
+    $('#form-cart-payment').on('submit', function (e) {
+
+        // If Stripe is selected
+        if ($('form#form-cart-payment input#payment_{$stripe_module_id}').is(':checked')) {
+
+            // If Stripe token is filled, prepare data to be displayed in Stripe card form
+            if ($("#stripe_token").val() == '') {
+
+                // Get currency and format order amount for Stripe
+                var currency = '{{currency attr="code"}|lower}';
+                var totalAmount = '{format_money number={{cart attr="total_taxed_price"} + {order attr="postage"}}}';
+
+                totalAmount = totalAmount.replace(".", "");
+                totalAmount = totalAmount.replace(",", "");
+
+                // Get order amount (in case once Stripe popup is displayed, the customer adds or removes a product from another tab)
+                $("#stripe_amount").val(totalAmount);
+
+                // Open Checkout with further options
+                handler.open({
+                    name: '{config key="store_name"}',
+                    currency: currency,
+                    amount: totalAmount,
+                    email: '{customer attr="email"}',
+                    allowRememberMe: false
+                });
+
+                e.preventDefault();
+            }
+        }
+    });
+
+    // Close Checkout on page navigation
+    $(window).on('popstate', function () {
+        handler.close();
+    });
+</script>

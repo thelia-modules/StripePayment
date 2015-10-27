@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes xmlns="http://symfony.com/schema/routing" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://symfony.com/schema/routing http://symfony.com/schema/routing/routing-1.0.xsd">
+  <route id="stripepayment.configuration.default" path="/admin/module/StripePayment" methods="get">
+    <default key="_controller">StripePayment:StripePaymentConfig:default</default>
+  </route>
+  <route id="stripepayment.configuration.save" path="/admin/module/StripePayment" methods="post">
+    <default key="_controller">StripePayment:StripePaymentConfig:save</default>
+  </route>
+  <route id="stripepayment.stripe_customer.list" path="/admin/module/StripePayment/stripe_customer" methods="get">
+    <default key="_controller">StripePayment:StripeCustomer:default</default>
+  </route>
+  <route id="stripepayment.stripe_customer.create" path="/admin/module/StripePayment/stripe_customer" methods="post">
+    <default key="_controller">StripePayment:StripeCustomer:create</default>
+  </route>
+  <route id="stripepayment.stripe_customer.view" path="/admin/module/StripePayment/stripe_customer/edit" methods="get">
+    <default key="_controller">StripePayment:StripeCustomer:update</default>
+  </route>
+  <route id="stripepayment.stripe_customer.edit" path="/admin/module/StripePayment/stripe_customer/edit" methods="post">
+    <default key="_controller">StripePayment:StripeCustomer:processUpdate</default>
+  </route>
+  <route id="stripepayment.stripe_customer.delete" path="/admin/module/StripePayment/stripe_customer/delete" methods="post">
+    <default key="_controller">StripePayment:StripeCustomer:delete</default>
+  </route>
+</routes>
