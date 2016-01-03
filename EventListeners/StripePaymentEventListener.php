@@ -120,15 +120,14 @@ class StripePaymentEventListener implements EventSubscriberInterface
      */
     public function stripePayment(OrderEvent $event)
     {
+        $order = $event->getPlacedOrder();
         $stripeModule = ModuleQuery::create()->findOneByCode($this->getStripeCode());
-        if ($event->getOrder()->getPaymentModuleId() !== $stripeModule->getId()) {
+        if ($order->getPaymentModuleId() !== $stripeModule->getId()) {
             return;
         }
         
         $logMessage = null;
         $userMessage = null;
-
-        $order = $event->getPlacedOrder();
 
         \Stripe\Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
 
