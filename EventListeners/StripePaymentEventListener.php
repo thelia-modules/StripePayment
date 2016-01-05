@@ -21,6 +21,7 @@ use Thelia\Model\ConfigQuery;
 use Thelia\Model\Order as OrderModel;
 use Thelia\Model\OrderStatusQuery;
 use Thelia\Tools\URL;
+use Thelia\Model\ModuleQuery;
 
 /**
  * Class StripePaymentEventListener
@@ -104,6 +105,14 @@ class StripePaymentEventListener implements EventSubscriberInterface
     }
 
     /**
+     * returns the StripePayment module code
+     */
+    public function getStripeCode()
+    {
+        return "StripePayment";
+    }    
+
+    /**
      * Send data to Stripe, save token, change order status & get response
      * @param OrderEvent $event
      * @throws \Exception
@@ -111,10 +120,14 @@ class StripePaymentEventListener implements EventSubscriberInterface
      */
     public function stripePayment(OrderEvent $event)
     {
+        $order = $event->getPlacedOrder();
+        $stripeModule = ModuleQuery::create()->findOneByCode($this->getStripeCode());
+        if ($order->getPaymentModuleId() !== $stripeModule->getId()) {
+            return;
+        }
+        
         $logMessage = null;
         $userMessage = null;
-
-        $order = $event->getPlacedOrder();
 
         \Stripe\Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
 
