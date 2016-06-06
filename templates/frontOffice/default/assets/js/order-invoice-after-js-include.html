@@ -24,10 +24,7 @@
 
                 // Get currency and format order amount for Stripe
                 var currency = '{{currency attr="code"}|lower}';
-                var totalAmount = '{format_money number={{cart attr="total_taxed_price"} + {order attr="postage"}}}';
-
-                totalAmount = totalAmount.replace(".", "");
-                totalAmount = totalAmount.replace(",", "");
+                var totalAmount = {{{{cart attr="total_taxed_price"} + {order attr="postage"}}*100}|round:0};
 
                 // Get order amount (in case once Stripe popup is displayed, the customer adds or removes a product from another tab)
                 $("#stripe_amount").val(totalAmount);
