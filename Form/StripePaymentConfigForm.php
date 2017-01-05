@@ -22,7 +22,7 @@ class StripePaymentConfigForm extends BaseStripePaymentConfigForm
             "secret_key" => $this->translator->trans("Your secret key", [], StripePayment::MESSAGE_DOMAIN),
             "publishable_key" => $this->translator->trans("Your publishable key (test or live)", [], StripePayment::MESSAGE_DOMAIN),
             "help.enabled" => $this->translator->trans("Do you want to activate Stripe Payment", [], StripePayment::MESSAGE_DOMAIN),
-            "help.secret_key" => $this->translator->trans("You can see all your keys in your Stripe dashboard. Also note that you can place your test or your live API keys", [], StripePayment::MESSAGE_DOMAIN),
+            "help.secret_key" => $this->translator->trans("You can see all your keys in your <a target=\"_blank\" href=\"https://dashboard.stripe.com/\">Stripe dashboard</a>. Also note that you can place your test or your live API keys", [], StripePayment::MESSAGE_DOMAIN),
         );
     }
 }
