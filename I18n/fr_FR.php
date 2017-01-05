@@ -14,7 +14,7 @@ return array(
     'Stripe library isn\'t installed' => 'La librairie Stripe n\'est pas installée',
     'The payment mean does not have the same amount as your cart. Please reload and try again.' => 'Le moyen de paiement n\'indique pas le même montant que votre panier. Rechargez la pager et réessayez.',
     'Too many requests too quickly.' => 'Trop de requêtes en peu de temps.',
-    'You can see all your keys in your Stripe dashboard. Also note that you can place your test or your live API keys' => 'Vos clés sont disponibles dans votre compte sur la plateforme d\'administration Stripe. Veuillez noter que vous devez renseigner ici vos clés publique et privée.',
+    'You can see all your keys in your <a target="_blank" href="https://dashboard.stripe.com/">Stripe dashboard</a>. Also note that you can place your test or your live API keys' => 'Vos clés sont disponibles dans votre compte sur la <a target="_blank" href="https://dashboard.stripe.com/">plateforme d\'administration Stripe</a>. Veuillez noter que vous devez renseigner ici vos clés publique et privée.',
     'Your card has been declined.' => 'Votre carte bancaire a été refusée.',
     'Your publishable key (test or live)' => 'Votre clé publique',
     'Your secret key' => 'Votre clé secrète',
