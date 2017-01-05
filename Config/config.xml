@@ -12,7 +12,6 @@
   <services>
     <service id="stripepayment.eventlistener" class="StripePayment\EventListeners\StripePaymentEventListener" scope="request">
       <argument id="request" type="service"/>
-      <argument id="router.front" type="service"/>
       <argument type="service" id="thelia.parser"/>
       <argument type="service" id="mailer"/>
       <tag name="kernel.event_subscriber"/>

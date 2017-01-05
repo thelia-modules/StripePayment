@@ -7,8 +7,6 @@ use StripePayment\Classes\StripePaymentLog;
 use StripePayment\StripePayment;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Router;
-use Symfony\Component\Validator\Constraints;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\Event\TheliaFormEvent;
@@ -33,19 +31,15 @@ class StripePaymentEventListener implements EventSubscriberInterface
     /** @var Request  */
     protected $request;
 
-    /** @var Router  */
-    protected $router;
-
     /** @var ParserInterface */
     protected $parser;
 
     /** @var MailerFactory */
     protected $mailer;
 
-    function __construct(Request $request, Router $router, ParserInterface $parser, MailerFactory $mailer)
+    function __construct(Request $request, ParserInterface $parser, MailerFactory $mailer)
     {
         $this->request = $request;
-        $this->router = $router;
         $this->parser = $parser;
         $this->mailer = $mailer;
     }
@@ -377,16 +371,7 @@ class StripePaymentEventListener implements EventSubscriberInterface
     public function redirectToFailurePage($orderId, $message)
     {
         throw new RedirectException(
-            URL::getInstance()->absoluteUrl(
-                $this->router->generate(
-                    'order.failed',
-                    [
-                        'order_id' => $orderId,
-                        'message' => $message
-                    ],
-                    Router::ABSOLUTE_PATH
-                )
-            )
+            URL::getInstance()->absoluteUrl("/order/failed/$orderId/$message")
         );
     }
 }
