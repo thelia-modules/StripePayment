@@ -3,6 +3,10 @@ config:
     type: checkbox
     label: Activated ?
     help: Do you want to activate Stripe Payment
+  stripe_element:
+    type: checkbox
+    label: Activated stripe element else paiement with checkout ?
+    help: Do you want to activate Stripe element
   secret_key:
     type: text
     required: true
@@ -12,3 +16,11 @@ config:
     type: text
     required: true
     label: Your publishable key (test or live)
+  webhooks_key:
+    type: text
+    required: true
+    label: Your webhooks secret key (test or live)
+  secure_url:
+    type: text
+    required: true
+    label: Your chose a key for secure webhook return

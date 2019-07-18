@@ -1,4 +1,13 @@
-<input type="hidden" name="thelia_order_payment[stripe_token]" id="stripe_token" value="">
-<input type="hidden" name="thelia_order_payment[stripe_amount]" id="stripe_amount" value="">
-
-<script src="https://checkout.stripe.com/checkout.js"></script>
+<div class="form-row" >
+	<label for="card-element">
+		{intl l="Credit or debit card"}
+	</label>
+	<div id="card-element">
+	<!-- A Stripe Element will be inserted here. -->
+	</div>
+	<div id="payment-request-button">
+	  <!-- A Stripe Element will be inserted here. -->
+	</div>
+	<!-- Used to display form errors. -->
+	<div id="card-errors" role="alert"></div>
+</div>

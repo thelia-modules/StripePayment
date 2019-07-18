@@ -7,6 +7,8 @@
     <hook id="stripepayment.hook" class="StripePayment\Hook\StripePaymentHook" scope="request">
       <tag name="hook.event_listener" event="order-invoice.payment-extra" type="front" method="includeStripe"/>
       <tag name="hook.event_listener" event="order-invoice.after-javascript-include" type="front" method="declareStripeOnClickEvent"/>
+      <tag name="hook.event_listener" event="main.after-javascript-include" type="front" method="includeStripeJsV3"/>
+      <tag name="hook.event_listener" event="main.head-bottom" type="front" method="onMainHeadBottom"/>
     </hook>
   </hooks>
   <services>

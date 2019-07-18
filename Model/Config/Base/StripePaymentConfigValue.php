@@ -19,7 +19,10 @@ namespace StripePayment\Model\Config\Base;
 class StripePaymentConfigValue
 {
     const ENABLED = "enabled";
+    const STRIPE_ELEMENT = "stripe_element";
     const SECRET_KEY = "secret_key";
     const PUBLISHABLE_KEY = "publishable_key";
+    const WEBHOOKS_KEY = "webhooks_key";
+    const SECURE_URL = "secure_url";
 }
 

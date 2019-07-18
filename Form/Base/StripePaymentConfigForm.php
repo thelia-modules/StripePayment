@@ -46,8 +46,11 @@ class StripePaymentConfigForm extends BaseForm
         $fieldsIdKeys = $this->getFieldsIdKeys();
 
         $this->addEnabledField($translationKeys, $fieldsIdKeys);
+        $this->addStripeElementField($translationKeys, $fieldsIdKeys);
         $this->addSecretKeyField($translationKeys, $fieldsIdKeys);
         $this->addPublishableKeyField($translationKeys, $fieldsIdKeys);
+        $this->addWebhooksKeyField($translationKeys, $fieldsIdKeys);
+        $this->addSecureUrlField($translationKeys, $fieldsIdKeys);
     }
 
     protected function addEnabledField(array $translationKeys, array $fieldsIdKeys)
@@ -63,6 +66,22 @@ class StripePaymentConfigForm extends BaseForm
                 "constraints" => array(
                 ),
                 "value" => StripePayment::getConfigValue(StripePaymentConfigValue::ENABLED, false),
+            ))
+        ;
+    }
+    protected function addStripeElementField(array $translationKeys, array $fieldsIdKeys)
+    {
+        $this->formBuilder
+            ->add("stripe_element", "checkbox", array(
+                "label" => $this->readKey("stripe_element", $translationKeys),
+                "label_attr" => [
+                    "for" => $this->readKey("stripeelementch", $fieldsIdKeys),
+                    "help" => $this->readKey("help.stripe_element", $translationKeys)
+                ],
+                "required" => false,
+                "constraints" => array(
+                ),
+                "value" => StripePayment::getConfigValue(StripePaymentConfigValue::STRIPE_ELEMENT, false),
             ))
         ;
     }
@@ -103,6 +122,41 @@ class StripePaymentConfigForm extends BaseForm
         ;
     }
 
+    protected function addWebhooksKeyField(array $translationKeys, array $fieldsIdKeys)
+    {
+        $this->formBuilder
+            ->add("webhooks_key", "text", array(
+                "label" => $this->readKey("webhooks_key", $translationKeys),
+                "label_attr" => [
+                    "for" => $this->readKey("webhooks_key", $fieldsIdKeys),
+                    "help" => $this->readKey("help.webhooks_key", $translationKeys)
+                ],
+                "required" => true,
+                "constraints" => array(
+                    new NotBlank(),
+                ),
+                "data" => StripePayment::getConfigValue(StripePaymentConfigValue::WEBHOOKS_KEY),
+            ))
+        ;
+    }
+    protected function addSecureUrlField(array $translationKeys, array $fieldsIdKeys)
+    {
+        $this->formBuilder
+            ->add("secure_url", "text", array(
+                "label" => $this->readKey("secure_url", $translationKeys),
+                "label_attr" => [
+                    "for" => $this->readKey("secure_url", $fieldsIdKeys),
+                    "help" => $this->readKey("help.secure_url", $translationKeys)
+                ],
+                "required" => true,
+                "constraints" => array(
+                    new NotBlank(),
+                ),
+                "data" => StripePayment::getConfigValue(StripePaymentConfigValue::SECURE_URL),
+            ))
+        ;
+    }
+
     public function getName()
     {
         return static::FORM_NAME;
@@ -127,7 +181,9 @@ class StripePaymentConfigForm extends BaseForm
         return array(
             "enabled" => "enabled",
             "secret_key" => "secret_key",
-            "publishable_key" => "publishable_key"
+            "publishable_key" => "publishable_key",
+            "webhooks_key" => "webhooks_key",
+            "secure_url" => "secure_url"
         );
     }
 }
