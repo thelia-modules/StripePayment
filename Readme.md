@@ -14,7 +14,7 @@ Be aware that API files are set into the core/vendor folder.
 
 * Copy the module into ```<thelia_root>/local/modules/``` directory and be sure that the name of the module is StripePayment.
 * Install the Stripe PHP library :
-    * add "stripe/stripe-php" to your composer.json file with command : `composer require stripe/stripe-php:"3.*"`
+    * add "stripe/stripe-php" to your composer.json file with command : `composer require stripe/stripe-php:"6.*"`
     * or download the library from <https://github.com/stripe/stripe-php/releases> and install it in your `core/vendor` directory
 * Activate it in your Thelia administration panel
 
@@ -24,7 +24,7 @@ Be aware that API files are set into the core/vendor folder.
 Add it in your main thelia composer.json file:
 
 ```
-composer require thelia/stripe-payment-module:"~1.0"
+composer require thelia/stripe-payment-module ~2.0.0
 ```
 
 ### Configuration
