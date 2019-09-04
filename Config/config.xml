@@ -5,6 +5,8 @@
   </forms>
   <hooks>
     <hook id="stripepayment.hook" class="StripePayment\Hook\StripePaymentHook" scope="request">
+      <argument id="request" type="service"/>
+      <argument type="service" id="thelia.taxEngine"/>
       <tag name="hook.event_listener" event="order-invoice.payment-extra" type="front" method="includeStripe"/>
       <tag name="hook.event_listener" event="order-invoice.after-javascript-include" type="front" method="declareStripeOnClickEvent"/>
       <tag name="hook.event_listener" event="main.after-javascript-include" type="front" method="includeStripeJsV3"/>
@@ -12,10 +14,10 @@
     </hook>
   </hooks>
   <services>
-    <service id="stripepayment.eventlistener" class="StripePayment\EventListeners\StripePaymentEventListener" scope="request">
+    <service id="stripepayment.cart.event_listener" class="StripePayment\EventListeners\CartEventListener" scope="request">
       <argument id="request" type="service"/>
-      <argument type="service" id="thelia.parser"/>
-      <argument type="service" id="mailer"/>
+      <argument type="service" id="event_dispatcher" />
+      <argument type="service" id="thelia.taxEngine"/>
       <tag name="kernel.event_subscriber"/>
     </service>
   </services>

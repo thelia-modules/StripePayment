@@ -18,8 +18,8 @@
   <route id="stripepayment.stripe_customer.edit" path="/admin/module/StripePayment/stripe_customer/edit" methods="post">
     <default key="_controller">StripePayment:StripeCustomer:processUpdate</default>
   </route>
-  <route id="stripepayment.stripe_webhooks.listen" path="/module/StripePayment/stripe_webhook/{secure_url}/listen" methods="post">
-    <default key="_controller">StripePayment:StripeWebhooks:listen</default>
+  <route id="stripepayment.stripe_webhooks.listen" path="/module/StripePayment/stripe_webhook/{secure_url}/listen">
+    <default key="_controller">StripePayment:StripeWebHooks:listen</default>
   	<requirement key="secure_url">.*</requirement>
   </route>
   <route id="stripepayment.stripe_customer.delete" path="/admin/module/StripePayment/stripe_customer/delete" methods="post">
