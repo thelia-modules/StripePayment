@@ -18,10 +18,15 @@ class StripePaymentConfigForm extends BaseStripePaymentConfigForm
     public function getTranslationKeys()
     {
         return array(
-            "enabled" => $this->translator->trans("Activated ?", [], StripePayment::MESSAGE_DOMAIN),
+            "enabled" => $this->translator->trans("Activate payment with stripe ?", [], StripePayment::MESSAGE_DOMAIN),
+            "stripe_element" => $this->translator->trans("Activate Element ?", [], StripePayment::MESSAGE_DOMAIN),
+            "one_click_payment" => $this->translator->trans("Activate one click payment ?", [], StripePayment::MESSAGE_DOMAIN),
             "secret_key" => $this->translator->trans("Your secret key", [], StripePayment::MESSAGE_DOMAIN),
             "publishable_key" => $this->translator->trans("Your publishable key (test or live)", [], StripePayment::MESSAGE_DOMAIN),
+            "webhooks_key" => $this->translator->trans("Your webhooks key", [], StripePayment::MESSAGE_DOMAIN),
+            "secure_url" => $this->translator->trans("Your chain of char for secure return webhook", [], StripePayment::MESSAGE_DOMAIN),
             "help.enabled" => $this->translator->trans("Do you want to activate Stripe Payment", [], StripePayment::MESSAGE_DOMAIN),
+            "help.stripe_element" => $this->translator->trans("Element is the embedded and customizable payment form", [], StripePayment::MESSAGE_DOMAIN),
             "help.secret_key" => $this->translator->trans("You can see all your keys in your <a target=\"_blank\" href=\"https://dashboard.stripe.com/\">Stripe dashboard</a>. Also note that you can place your test or your live API keys", [], StripePayment::MESSAGE_DOMAIN),
         );
     }

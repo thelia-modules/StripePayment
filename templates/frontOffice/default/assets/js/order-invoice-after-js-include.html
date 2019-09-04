@@ -1,50 +1,157 @@
 <script>
+    // Create a Stripe client.
+    var stripe = Stripe('{$public_key}');
+    var intentSecret = '{$clientSecret}';
+    var totalAmount = Math.round(({cart attr="total_taxed_price"} + {order attr="postage"}) * 100);
+    var currency = '{$currency}';
+    var country = '{$country}';
+    var storeName = '{config key="store_name"}';
 
-    // Stripe handler
-    var handler = StripeCheckout.configure({
-        key: '{$public_key}',
-        locale: 'auto',
-        token: function(token) {
-            // When Stripe card form is submitted, get Stripe token
-            $("#stripe_token").val(token.id);
+    {literal}
+    // Create an instance of Elements.
+    var elements = stripe.elements();
 
-            // Submit invoice form
-            $("#form-cart-payment").submit();
+    var paymentRequest = stripe.paymentRequest({
+        currency: currency,
+        country: country,
+        total: {
+            label: storeName,
+            amount: totalAmount,
+        },
+        requestPayerName: true,
+        requestPayerEmail: true,
+    });
+
+    var prButton = elements.create('paymentRequestButton', {
+        paymentRequest: paymentRequest,
+    });
+
+    // Check the availability of the Payment Request API first.
+    paymentRequest.canMakePayment().then(function (result) {
+        if (result) {
+            prButton.mount("#payment-request-button");
         }
     });
 
-    // When payment form is submitted
-    $('#form-cart-payment').on('submit', function (e) {
-
-        // If Stripe is selected
-        if ($('form#form-cart-payment input#payment_{$stripe_module_id}').is(':checked')) {
-
-            // If Stripe token is filled, prepare data to be displayed in Stripe card form
-            if ($("#stripe_token").val() == '') {
-
-                // Get currency and format order amount for Stripe
-                var currency = '{{currency attr="code"}|lower}';
-                var totalAmount = {{{{cart attr="total_taxed_price"} + {order attr="postage"}}*100}|round:0};
-
-                // Get order amount (in case once Stripe popup is displayed, the customer adds or removes a product from another tab)
-                $("#stripe_amount").val(totalAmount);
-
-                // Open Checkout with further options
-                handler.open({
-                    name: '{config key="store_name"}',
-                    currency: currency,
-                    amount: totalAmount,
-                    email: '{customer attr="email"}',
-                    allowRememberMe: false
-                });
-
-                e.preventDefault();
+    paymentRequest.on('paymentmethod', function (ev) {
+        // Trigger HTML5 validation UI on the form if any of the inputs fail
+        // validation.
+        var plainInputsValid = true;
+        Array.prototype.forEach.call(form.querySelectorAll('input'), function(
+            input
+        ) {
+            if (input.checkValidity && !input.checkValidity()) {
+                plainInputsValid = false;
+                ev.complete('fail');
+                return;
             }
+        });
+        if (!plainInputsValid) {
+            triggerBrowserValidation();
+            ev.complete('fail');
+            return;
+        }
+
+        stripe.confirmPaymentIntent(
+            intentSecret,
+            {
+                payment_method: ev.paymentMethod.id,
+            }
+        ).then(function (confirmResult) {
+            console.log("CONFIRM");
+            if (confirmResult.error) {
+                console.log("ERROR", confirmResult.error);
+
+                // Report to the browser that the payment failed, prompting it to
+                // re-show the payment interface, or show an error message and close
+                // the payment interface.
+                ev.complete('fail');
+                $('#payment-request-errors').html(confirmResult.error.message);
+                $('#payment-request-errors').removeClass('hidden');
+            } else {
+                console.log("Success");
+
+                // Report to the browser that the confirmation was successful, prompting
+                // it to close the browser payment method collection interface.
+                ev.complete('success');
+                validPayment();
+            }
+        });
+    });
+
+    function triggerBrowserValidation() {
+        // The only way to trigger HTML5 form validation UI is to fake a user submit
+        // event.
+        var submit = document.createElement('input');
+        submit.type = 'submit';
+        submit.style.display = 'none';
+        form.appendChild(submit);
+        submit.click();
+        submit.remove();
+    }
+
+    // Custom styling can be passed to options when creating an Element.
+    // (Note that this demo uses a wider set of styles than the guide below.)
+    var style = {
+        base: {
+            color: "#32325D",
+            fontWeight: 500,
+            fontFamily: "Inter UI, Open Sans, Segoe UI, sans-serif",
+            fontSize: "16px",
+            fontSmoothing: "antialiased",
+
+            "::placeholder": {
+                color: "#CFD7DF"
+            }
+        },
+        invalid: {
+            color: "#E25950"
+        }
+    };
+
+    // Create an instance of the card Element.
+    var card = elements.create('card', {style: style});
+
+    // Add an instance of the card Element into the `card-element` <div>.
+    card.mount('#card-element');
+
+    // Handle real-time validation errors from the card Element.
+    card.addEventListener('change', function (event) {
+        var displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+        } else {
+            displayError.textContent = '';
         }
     });
 
-    // Close Checkout on page navigation
-    $(window).on('popstate', function () {
-        handler.close();
+    // Handle form submission.
+    var form = document.getElementById('form-cart-payment');
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        stripe.handleCardPayment(
+            intentSecret,
+            card
+        ).then( function (result) {
+            if (result.error) {
+                console.log(result.error);
+                $('#card-errors').html(result.error.message);
+                $('#card-errors').removeClass('hidden');
+                // Display error.message in your UI.
+            } else {
+                console.log("Success");
+                validPayment();
+            }
+        });
     });
+
+    function validPayment() {
+        var form = document.getElementById('form-cart-payment');
+        // Submit the form
+        form.submit();
+    }
+
+    {/literal}
+
 </script>
