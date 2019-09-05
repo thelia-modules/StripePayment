@@ -51,6 +51,13 @@ class StripeWebHooksController extends BaseFrontController
                         $paymentId = $event->data->object->id;
                         $this->handlePaymentIntentSuccess($paymentId);
                         break;
+                    case 'payment_intent.payment_failed':
+                        // Needed to wait for order to be created (Stripe is faster than Thelia)
+                        sleep(5);
+                        /** @var Session $sessionCompleted */
+                        $paymentId = $event->data->object->id;
+                        $this->handlePaymentIntentFail($paymentId);
+                        break;
                     default:
                         // Unexpected event type
                         (new StripePaymentLog())->logText('Unexpected event type');
@@ -97,6 +104,18 @@ class StripeWebHooksController extends BaseFrontController
         $this->setOrderToPaid($order);
     }
 
+    protected function handlePaymentIntentFail($paymentId)
+    {
+        $order = OrderQuery::create()
+            ->findOneByTransactionRef($paymentId);
+
+        if (null === $order) {
+            throw new \Exception("Order with transaction ref $paymentId not found");
+        }
+
+        $this->setOrderToCanceled($order);
+    }
+
     protected function setOrderToPaid($order)
     {
         $paidStatusId = OrderStatusQuery::create()
@@ -106,6 +125,18 @@ class StripeWebHooksController extends BaseFrontController
 
         $event = new OrderEvent($order);
         $event->setStatus($paidStatusId);
+        $this->getDispatcher()->dispatch(TheliaEvents::ORDER_UPDATE_STATUS, $event);
+    }
+
+    protected function setOrderToCanceled($order)
+    {
+        $canceledStatusId = OrderStatusQuery::create()
+                ->filterByCode('canceled')
+                ->select('ID')
+                ->findOne();
+
+        $event = new OrderEvent($order);
+        $event->setStatus($canceledStatusId);
         $this->getDispatcher()->dispatch(TheliaEvents::ORDER_UPDATE_STATUS, $event);
     }
 }
