@@ -45,6 +45,7 @@ class StripePayment extends AbstractPaymentModule
     const STRIPE_VERSION_MAX = "7.0.0";
 
     const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
+    const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
     const PAYMENT_INTENT_SECRET_SESSION_KEY = 'payment_intent_secret';
 
     public function preActivation(ConnectionInterface $con = null)
@@ -190,11 +191,13 @@ class StripePayment extends AbstractPaymentModule
                     ->save();
                 $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
                 $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
+                $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
 
                 return;
             }else{
                 $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
                 $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
+                $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
 
                 // Create the session on Stripe's servers - this will charge the user's order and save session id into order transaction reference
                 return $this->createStripeSession($order);

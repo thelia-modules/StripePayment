@@ -17,6 +17,7 @@ use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Session\Session;
 use Thelia\Model\Cart;
+use Thelia\Model\Customer;
 use Thelia\Model\Order;
 use Thelia\TaxEngine\TaxEngine;
 
@@ -126,10 +127,37 @@ class CartEventListener implements EventSubscriberInterface
             return false;
         }
 
-        return [
+        $values = [
             'amount' => intval(round($totalAmount)),
             'currency' => strtolower($currency->getCode())
         ];
+
+        if (null !== $stripeCustomerId = $this->getStripeCustomerId($session)) {
+            $values['customer'] = $stripeCustomerId;
+        }
+
+        return $values;
+    }
+
+    protected function getStripeCustomerId(Session $session)
+    {
+        if (null ===  $session->getCustomerUser()) {
+            return null;
+        }
+
+        if (!$session->has(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY)) {
+            /** @var Customer $customer */
+            $customer = $session->getCustomerUser();
+            $email = $customer->getEmail();
+
+            $stripeCustomer = \Stripe\Customer::create([
+                'email' => $email
+            ]);
+
+            $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, $stripeCustomer->id);
+        }
+
+        return $session->get(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY);
     }
 
     protected function getCartAndOrderFromEvent(ActionEvent $event)

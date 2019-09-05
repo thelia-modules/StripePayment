@@ -35,6 +35,8 @@ Put your Stripe account in live mode.
 
 Then activate the Stripe in the module configuration panel.
 
+Activate the webhooks in stripe dashboard with the url specified in Thelia Back-office Stripe configuration, 
+and add events listed in Thelia Back-office Stripe configuration.
 
 ### Logs
 
