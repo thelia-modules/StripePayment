@@ -1,6 +1,7 @@
 <script>
     // Create a Stripe client.
     var stripe = Stripe('{$public_key}');
+    var stripeModuleId = '{$stripe_module_id}';
     var intentSecret = '{$clientSecret}';
     var totalAmount = Math.round(({cart attr="total_taxed_price"} + {order attr="postage"}) * 100);
     var currency = '{$currency}';
@@ -128,22 +129,24 @@
     // Handle form submission.
     var form = document.getElementById('form-cart-payment');
     form.addEventListener('submit', function (event) {
-        event.preventDefault();
+        if($('#payment_'+stripeModuleId).is(':checked')) {
+            event.preventDefault();
 
-        stripe.handleCardPayment(
-            intentSecret,
-            card
-        ).then( function (result) {
-            if (result.error) {
-                console.log(result.error);
-                $('#card-errors').html(result.error.message);
-                $('#card-errors').removeClass('hidden');
-                // Display error.message in your UI.
-            } else {
-                console.log("Success");
-                validPayment();
-            }
-        });
+            stripe.handleCardPayment(
+                intentSecret,
+                card
+            ).then( function (result) {
+                if (result.error) {
+                    console.log(result.error);
+                    $('#card-errors').html(result.error.message);
+                    $('#card-errors').removeClass('hidden');
+                    // Display error.message in your UI.
+                } else {
+                    console.log("Success");
+                    validPayment();
+                }
+            });
+        }
     });
 
     function validPayment() {
