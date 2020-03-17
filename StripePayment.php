@@ -344,7 +344,7 @@ class StripePayment extends AbstractPaymentModule
             'description' => null,
             'quantity'=> 1,
             'currency' => strtolower($currency->getCode()),
-            'amount' =>  $order->getTotalAmount() * 100
+            'amount' => round($order->getTotalAmount(), 2) * 100
         ];
 
         if(empty($lineItems)){
