@@ -17,10 +17,9 @@ use Thelia\Model\OrderStatusQuery;
 
 class StripeWebHooksController extends BaseFrontController
 {
-	public function listenAction($secure_url)
+    public function listenAction($secure_url)
     {
-
-        if(StripePayment::getConfigValue('secure_url') == $secure_url){
+        if (StripePayment::getConfigValue('secure_url') == $secure_url) {
             try {
                 Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
 
@@ -66,16 +65,16 @@ class StripeWebHooksController extends BaseFrontController
                 }
 
                 return new Response('Success', 200);
-            } catch(\UnexpectedValueException $e) {
+            } catch (\UnexpectedValueException $e) {
                 // Invalid payload
                 (new StripePaymentLog())->logText($e->getMessage());
                 return new Response('Invalid payload', 400);
-            } catch(SignatureVerification $e) {
+            } catch (SignatureVerification $e) {
                 return new Response($e->getMessage(), 400);
-            } catch(\Exception $e) {
+            } catch (\Exception $e) {
                 return new Response($e->getMessage(), 404);
             }
-		}
+        }
 
         return new Response('Bad request', 400);
     }
@@ -119,9 +118,9 @@ class StripeWebHooksController extends BaseFrontController
     protected function setOrderToPaid($order)
     {
         $paidStatusId = OrderStatusQuery::create()
-                ->filterByCode('paid')
-                ->select('ID')
-                ->findOne();
+            ->filterByCode('paid')
+            ->select('ID')
+            ->findOne();
 
         $event = new OrderEvent($order);
         $event->setStatus($paidStatusId);
@@ -131,9 +130,9 @@ class StripeWebHooksController extends BaseFrontController
     protected function setOrderToCanceled($order)
     {
         $canceledStatusId = OrderStatusQuery::create()
-                ->filterByCode('canceled')
-                ->select('ID')
-                ->findOne();
+            ->filterByCode('canceled')
+            ->select('ID')
+            ->findOne();
 
         $event = new OrderEvent($order);
         $event->setStatus($canceledStatusId);
