@@ -67,8 +67,11 @@
                 // re-show the payment interface, or show an error message and close
                 // the payment interface.
                 ev.complete('fail');
-                $('#payment-request-errors').html(confirmResult.error.message);
-                $('#payment-request-errors').removeClass('hidden');
+                var paymentRequestError = document.createElement('payment-request-errors');
+
+                paymentRequestError.innerHTML = confirmResult.error.message;
+                paymentRequestError.classList.remove('hidden');
+
             } else {
                 console.log("Success");
 
@@ -129,7 +132,10 @@
     // Handle form submission.
     var form = document.getElementById('form-cart-payment');
     form.addEventListener('submit', function (event) {
-        if($('#payment_'+stripeModuleId).is(':checked')) {
+        var paymetnDiv = document.getElementById('payment_'+stripeModuleId);
+        var displayError = document.getElementById('card-errors');
+
+        if(paymetnDiv && paymetnDiv.checked) {
             event.preventDefault();
 
             stripe.handleCardPayment(
@@ -138,8 +144,8 @@
             ).then( function (result) {
                 if (result.error) {
                     console.log(result.error);
-                    $('#card-errors').html(result.error.message);
-                    $('#card-errors').removeClass('hidden');
+                    displayError.innerHTML = result.error.message;
+                    displayError.classList.remove('hidden');
                     // Display error.message in your UI.
                 } else {
                     console.log("Success");
