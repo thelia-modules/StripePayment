@@ -8,16 +8,24 @@ use Stripe\Stripe;
 use Stripe\Webhook;
 use StripePayment\Classes\StripePaymentLog;
 use StripePayment\StripePayment;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Thelia\Controller\Front\BaseFrontController;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Response;
 use Thelia\Model\OrderQuery;
 use Thelia\Model\OrderStatusQuery;
+use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @Route("/module/StripePayment/stripe_webhook", name="stripe_webhook")
+ */
 class StripeWebHooksController extends BaseFrontController
 {
-    public function listenAction($secure_url)
+    /**
+     * @Route("/{secure_url}/listen", name="_listen")
+     */
+    public function listenAction($secure_url, EventDispatcherInterface $dispatcher)
     {
         if (StripePayment::getConfigValue('secure_url') == $secure_url) {
             try {
@@ -41,21 +49,21 @@ class StripeWebHooksController extends BaseFrontController
                     case 'checkout.session.completed':
                         /** @var Session $sessionCompleted */
                         $sessionCompleted = $event->data->object;
-                        $this->handleSessionCompleted($sessionCompleted);
+                        $this->handleSessionCompleted($sessionCompleted, $dispatcher);
                         break;
                     case 'payment_intent.succeeded':
                         // Needed to wait for order to be created (Stripe is faster than Thelia)
                         sleep(5);
                         /** @var Session $sessionCompleted */
                         $paymentId = $event->data->object->id;
-                        $this->handlePaymentIntentSuccess($paymentId);
+                        $this->handlePaymentIntentSuccess($paymentId, $dispatcher);
                         break;
                     case 'payment_intent.payment_failed':
                         // Needed to wait for order to be created (Stripe is faster than Thelia)
                         sleep(5);
                         /** @var Session $sessionCompleted */
                         $paymentId = $event->data->object->id;
-                        $this->handlePaymentIntentFail($paymentId);
+                        $this->handlePaymentIntentFail($paymentId, $dispatcher);
                         break;
                     default:
                         // Unexpected event type
@@ -79,7 +87,7 @@ class StripeWebHooksController extends BaseFrontController
         return new Response('Bad request', 400);
     }
 
-    protected function handleSessionCompleted(Session $sessionCompleted)
+    protected function handleSessionCompleted(Session $sessionCompleted, EventDispatcherInterface $dispatcher)
     {
         $order = OrderQuery::create()
             ->findOneByRef($sessionCompleted->client_reference_id);
@@ -88,10 +96,10 @@ class StripeWebHooksController extends BaseFrontController
             throw new \Exception("Order with reference $sessionCompleted->client_reference_id not found");
         }
 
-        $this->setOrderToPaid($order);
+        $this->setOrderToPaid($order, $dispatcher);
     }
 
-    protected function handlePaymentIntentSuccess($paymentId)
+    protected function handlePaymentIntentSuccess($paymentId, EventDispatcherInterface $dispatcher)
     {
         $order = OrderQuery::create()
             ->findOneByTransactionRef($paymentId);
@@ -100,10 +108,10 @@ class StripeWebHooksController extends BaseFrontController
             throw new \Exception("Order with transaction ref $paymentId not found");
         }
 
-        $this->setOrderToPaid($order);
+        $this->setOrderToPaid($order, $dispatcher);
     }
 
-    protected function handlePaymentIntentFail($paymentId)
+    protected function handlePaymentIntentFail($paymentId, EventDispatcherInterface $dispatcher)
     {
         $order = OrderQuery::create()
             ->findOneByTransactionRef($paymentId);
@@ -112,10 +120,10 @@ class StripeWebHooksController extends BaseFrontController
             throw new \Exception("Order with transaction ref $paymentId not found");
         }
 
-        $this->setOrderToCanceled($order);
+        $this->setOrderToCanceled($order, $dispatcher);
     }
 
-    protected function setOrderToPaid($order)
+    protected function setOrderToPaid($order, EventDispatcherInterface $dispatcher)
     {
         $paidStatusId = OrderStatusQuery::create()
             ->filterByCode('paid')
@@ -124,10 +132,10 @@ class StripeWebHooksController extends BaseFrontController
 
         $event = new OrderEvent($order);
         $event->setStatus($paidStatusId);
-        $this->getDispatcher()->dispatch(TheliaEvents::ORDER_UPDATE_STATUS, $event);
+        $dispatcher->dispatch($event, TheliaEvents::ORDER_UPDATE_STATUS);
     }
 
-    protected function setOrderToCanceled($order)
+    protected function setOrderToCanceled($order, EventDispatcherInterface $dispatcher)
     {
         $canceledStatusId = OrderStatusQuery::create()
             ->filterByCode('canceled')
@@ -136,6 +144,6 @@ class StripeWebHooksController extends BaseFrontController
 
         $event = new OrderEvent($order);
         $event->setStatus($canceledStatusId);
-        $this->getDispatcher()->dispatch(TheliaEvents::ORDER_UPDATE_STATUS, $event);
+        $dispatcher->dispatch($event, TheliaEvents::ORDER_UPDATE_STATUS);
     }
 }

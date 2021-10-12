@@ -2,8 +2,8 @@
 
 namespace StripePayment\Hook;
 
-use StripePayment\Model\Config\Base\StripePaymentConfigValue;
 use StripePayment\StripePayment;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
 use Thelia\Core\HttpFoundation\Request;
@@ -38,7 +38,7 @@ class StripePaymentHook extends BaseHook
 				[
 					'stripe_module_id' => $this->getModule()->getModuleId(),
 					'public_key' => $publicKey,
-                    'oneClickPayment' => StripePayment::getConfigValue(StripePaymentConfigValue::ONE_CLICK_PAYMENT, false),
+                    'oneClickPayment' => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
                     'clientSecret' => $clientSecret,
                     'currency' => $currency,
                     'country' => $country

@@ -7,8 +7,9 @@
 namespace StripePayment\Form\Base;
 
 use StripePayment\StripePayment;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Thelia\Form\BaseForm;
-use StripePayment\Model\Config\StripePaymentConfigValue;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 /**
@@ -57,7 +58,7 @@ class StripePaymentConfigForm extends BaseForm
     protected function addEnabledField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("enabled", "checkbox", array(
+            ->add("enabled", CheckboxType::class, array(
                 "label" => $this->readKey("enabled", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("enabled", $fieldsIdKeys),
@@ -66,7 +67,7 @@ class StripePaymentConfigForm extends BaseForm
                 "required" => false,
                 "constraints" => array(
                 ),
-                "value" => StripePayment::getConfigValue(StripePaymentConfigValue::ENABLED, false),
+                "value" => StripePayment::getConfigValue(StripePayment::ENABLED, false),
             ))
         ;
     }
@@ -74,7 +75,7 @@ class StripePaymentConfigForm extends BaseForm
     protected function addStripeElementField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("stripe_element", "checkbox", array(
+            ->add("stripe_element", CheckboxType::class, array(
                 "label" => $this->readKey("stripe_element", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("stripeelementch", $fieldsIdKeys),
@@ -83,7 +84,7 @@ class StripePaymentConfigForm extends BaseForm
                 "required" => false,
                 "constraints" => array(
                 ),
-                "value" => StripePayment::getConfigValue(StripePaymentConfigValue::STRIPE_ELEMENT, false),
+                "value" => StripePayment::getConfigValue(StripePayment::STRIPE_ELEMENT, false),
             ))
         ;
     }
@@ -91,7 +92,7 @@ class StripePaymentConfigForm extends BaseForm
     protected function addOneClickPaymentField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("one_click_payment", "checkbox", array(
+            ->add("one_click_payment", CheckboxType::class, array(
                 "label" => $this->readKey("one_click_payment", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("one_click_payment", $fieldsIdKeys)
@@ -99,7 +100,7 @@ class StripePaymentConfigForm extends BaseForm
                 "required" => false,
                 "constraints" => array(
                 ),
-                "value" => StripePayment::getConfigValue(StripePaymentConfigValue::ONE_CLICK_PAYMENT, false),
+                "value" => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
             ))
         ;
     }
@@ -107,7 +108,7 @@ class StripePaymentConfigForm extends BaseForm
     protected function addSecretKeyField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("secret_key", "text", array(
+            ->add("secret_key", TextType::class, array(
                 "label" => $this->readKey("secret_key", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("secret_key", $fieldsIdKeys),
@@ -117,7 +118,7 @@ class StripePaymentConfigForm extends BaseForm
                 "constraints" => array(
                     new NotBlank(),
                 ),
-                "data" => StripePayment::getConfigValue(StripePaymentConfigValue::SECRET_KEY),
+                "data" => StripePayment::getConfigValue(StripePayment::SECRET_KEY),
             ))
         ;
     }
@@ -125,7 +126,7 @@ class StripePaymentConfigForm extends BaseForm
     protected function addPublishableKeyField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("publishable_key", "text", array(
+            ->add("publishable_key", TextType::class, array(
                 "label" => $this->readKey("publishable_key", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("publishable_key", $fieldsIdKeys),
@@ -135,7 +136,7 @@ class StripePaymentConfigForm extends BaseForm
                 "constraints" => array(
                     new NotBlank(),
                 ),
-                "data" => StripePayment::getConfigValue(StripePaymentConfigValue::PUBLISHABLE_KEY),
+                "data" => StripePayment::getConfigValue(StripePayment::PUBLISHABLE_KEY),
             ))
         ;
     }
@@ -143,7 +144,7 @@ class StripePaymentConfigForm extends BaseForm
     protected function addWebhooksKeyField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("webhooks_key", "text", array(
+            ->add("webhooks_key", TextType::class, array(
                 "label" => $this->readKey("webhooks_key", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("webhooks_key", $fieldsIdKeys),
@@ -153,14 +154,14 @@ class StripePaymentConfigForm extends BaseForm
                 "constraints" => array(
                     new NotBlank(),
                 ),
-                "data" => StripePayment::getConfigValue(StripePaymentConfigValue::WEBHOOKS_KEY),
+                "data" => StripePayment::getConfigValue(StripePayment::WEBHOOKS_KEY),
             ))
         ;
     }
     protected function addSecureUrlField(array $translationKeys, array $fieldsIdKeys)
     {
         $this->formBuilder
-            ->add("secure_url", "text", array(
+            ->add("secure_url", TextType::class, array(
                 "label" => $this->readKey("secure_url", $translationKeys),
                 "label_attr" => [
                     "for" => $this->readKey("secure_url", $fieldsIdKeys),
@@ -170,12 +171,12 @@ class StripePaymentConfigForm extends BaseForm
                 "constraints" => array(
                     new NotBlank(),
                 ),
-                "data" => StripePayment::getConfigValue(StripePaymentConfigValue::SECURE_URL),
+                "data" => StripePayment::getConfigValue(StripePayment::SECURE_URL),
             ))
         ;
     }
 
-    public function getName()
+    public static function getName()
     {
         return static::FORM_NAME;
     }

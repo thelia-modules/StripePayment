@@ -6,12 +6,70 @@
 
 namespace StripePayment\Controller;
 
-use StripePayment\Controller\Base\StripePaymentConfigController as BaseStripePaymentConfigController;
+use StripePayment\Form\StripePaymentConfigForm;
+use StripePayment\StripePayment;
+use Thelia\Controller\Admin\BaseAdminController;
+use Thelia\Core\Security\AccessManager;
+use Thelia\Core\Security\Resource\AdminResources;
+use Thelia\Core\Template\ParserContext;
+use Thelia\Core\Translation\Translator;
+use Thelia\Form\Exception\FormValidationException;
+use Thelia\Tools\URL;
+use Symfony\Component\Routing\Annotation\Route;
 
 /**
+ * @Route("/admin/module/StripePayment", name="stripe_payment_config")
  * Class StripePaymentConfigController
  * @package StripePayment\Controller
  */
-class StripePaymentConfigController extends BaseStripePaymentConfigController
+class StripePaymentConfigController extends BaseAdminController
 {
+    /**
+     * @Route("", name="_save", methods="POST")
+     */
+    public function saveAction(ParserContext $context)
+    {
+        if (null !== $response = $this->checkAuth([AdminResources::MODULE], ["stripepayment"], AccessManager::UPDATE)) {
+            return $response;
+        }
+
+        $baseForm = $this->createForm(StripePaymentConfigForm::getName());
+
+        $errorMessage = null;
+
+        try {
+            $form = $this->validateForm($baseForm);
+            $data = $form->getData();
+            StripePayment::setConfigValue(StripePayment::ENABLED, is_bool($data["enabled"]) ? (int) ($data["enabled"]) : $data["enabled"]);
+            StripePayment::setConfigValue(StripePayment::STRIPE_ELEMENT, is_bool($data["stripe_element"]) ? (int) ($data["stripe_element"]) : $data["stripe_element"]);
+            StripePayment::setConfigValue(StripePayment::ONE_CLICK_PAYMENT, is_bool($data["one_click_payment"]) ? (int) ($data["one_click_payment"]) : $data["one_click_payment"]);
+            StripePayment::setConfigValue(StripePayment::SECRET_KEY, is_bool($data["secret_key"]) ? (int) ($data["secret_key"]) : $data["secret_key"]);
+            StripePayment::setConfigValue(StripePayment::PUBLISHABLE_KEY, is_bool($data["publishable_key"]) ? (int) ($data["publishable_key"]) : $data["publishable_key"]);
+            StripePayment::setConfigValue(StripePayment::WEBHOOKS_KEY, is_bool($data["webhooks_key"]) ? (int) ($data["webhooks_key"]) : $data["webhooks_key"]);
+            StripePayment::setConfigValue(StripePayment::SECURE_URL, is_bool($data["secure_url"]) ? (int) ($data["secure_url"]) : $data["secure_url"]);
+        } catch (FormValidationException $ex) {
+            // Invalid data entered
+            $errorMessage = $this->createStandardFormValidationErrorMessage($ex);
+        } catch (\Exception $ex) {
+            // Any other error
+            $errorMessage = Translator::getInstance()->trans('Sorry, an error occurred: %err', ['%err' => $ex->getMessage()], "", StripePayment::MESSAGE_DOMAIN);
+        }
+
+        if (null !== $errorMessage) {
+            // Mark the form as with error
+            $baseForm->setErrorMessage($errorMessage);
+
+            // Send the form and the error to the parser
+            $context
+                ->addForm($baseForm)
+                ->setGeneralError($errorMessage)
+            ;
+        } else {
+            $context
+                ->set("success", true)
+            ;
+        }
+
+        return $this->generateRedirect(URL::getInstance()->absoluteUrl('/admin/module/StripePayment'));
+    }
 }

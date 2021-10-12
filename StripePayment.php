@@ -9,6 +9,7 @@ use Stripe\Stripe;
 use StripePayment\Classes\StripePaymentException;
 use StripePayment\Classes\StripePaymentLog;
 use Symfony\Component\Config\Definition\Exception\Exception;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Thelia\Core\Event\Image\ImageEvent;
 use Thelia\Core\Event\TheliaEvents;
@@ -41,12 +42,20 @@ class StripePayment extends AbstractPaymentModule
 {
     const MESSAGE_DOMAIN = "stripepayment";
     const CONFIRMATION_MESSAGE_NAME = "stripe_confirm_payment";
-    const STRIPE_VERSION_MIN = "3.0.0";
+    const STRIPE_VERSION_MIN = "7.0.0";
     const STRIPE_VERSION_MAX = "7.0.0";
 
     const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
     const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
     const PAYMENT_INTENT_SECRET_SESSION_KEY = 'payment_intent_secret';
+
+    const ENABLED = "enabled";
+    const STRIPE_ELEMENT = "stripe_element";
+    const ONE_CLICK_PAYMENT = "one_click_payment";
+    const SECRET_KEY = "secret_key";
+    const PUBLISHABLE_KEY = "publishable_key";
+    const WEBHOOKS_KEY = "webhooks_key";
+    const SECURE_URL = "secure_url";
 
     public function preActivation(ConnectionInterface $con = null)
     {
@@ -60,7 +69,7 @@ class StripePayment extends AbstractPaymentModule
         return true;
     }
 
-    public function postActivation(ConnectionInterface $con = null)
+    public function postActivation(ConnectionInterface $con = null): void
     {
         // Module image
         $moduleModel = $this->getModuleModel();
@@ -181,7 +190,6 @@ class StripePayment extends AbstractPaymentModule
 
     protected function doPay(Order $order)
     {
-        Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
         $session = $this->getRequest()->getSession();
 
         try {
@@ -203,7 +211,7 @@ class StripePayment extends AbstractPaymentModule
                 return $this->createStripeSession($order);
             }
 
-        } catch(\Stripe\Error\Card $e) {
+        } catch(\Stripe\Exception\CardException $e) {
             // The card has been declined
             // FIXME Translate message here
             $logMessage = sprintf(
@@ -218,7 +226,7 @@ class StripePayment extends AbstractPaymentModule
                     [],
                     StripePayment::MESSAGE_DOMAIN
                 );
-        } catch (\Stripe\Error\RateLimit $e) {
+        } catch (\Stripe\Exception\RateLimitException $e) {
             // Too many requests made to the API too quickly
             $logMessage = sprintf(
                 'Error paying order %d with Stripe. Too many requests. Message: %s',
@@ -232,7 +240,7 @@ class StripePayment extends AbstractPaymentModule
                     [],
                     StripePayment::MESSAGE_DOMAIN
                 );
-        } catch (\Stripe\Error\InvalidRequest $e) {
+        } catch (\Stripe\Exception\InvalidRequestException $e) {
             // Invalid parameters were supplied to Stripe's API
             $logMessage = sprintf(
                 'Error paying order %d with Stripe. Invalid parameters. Message: %s',
@@ -246,7 +254,7 @@ class StripePayment extends AbstractPaymentModule
                     [],
                     StripePayment::MESSAGE_DOMAIN
                 );
-        } catch (\Stripe\Error\Authentication $e) {
+        } catch (\Stripe\Exception\AuthenticationException $e) {
             // Authentication with Stripe's API failed
             // (maybe you changed API keys recently)
             $logMessage = sprintf(
@@ -261,7 +269,7 @@ class StripePayment extends AbstractPaymentModule
                     [],
                     StripePayment::MESSAGE_DOMAIN
                 );
-        } catch (\Stripe\Error\ApiConnection $e) {
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
             // Network communication with Stripe failed
             $logMessage = sprintf(
                 'Error paying order %d with Stripe. Network communication failed. Message: %s',
@@ -275,7 +283,7 @@ class StripePayment extends AbstractPaymentModule
                     [],
                     StripePayment::MESSAGE_DOMAIN
                 );
-        } catch (\Stripe\Error\Base $e) {
+        } catch (\Stripe\Exception\ApiErrorException $e) {
             // Display a very generic error to the user
             $logMessage = sprintf(
                 'Error paying order %d with Stripe. Message: %s',
@@ -341,7 +349,6 @@ class StripePayment extends AbstractPaymentModule
 
         $lineItems[] = [
             'name'=> Translator::getInstance()->trans('Total', [], StripePayment::MESSAGE_DOMAIN ),
-            'description' => null,
             'quantity'=> 1,
             'currency' => strtolower($currency->getCode()),
             'amount' => round($order->getTotalAmount(), 2) * 100
@@ -351,11 +358,14 @@ class StripePayment extends AbstractPaymentModule
             throw new \Exception("Sorry, your cart is empty. There's nothing to pay.");
         }
 
-        $session = Session::create([
+        $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
+
+        $session = $stripe->checkout->sessions->create([
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
             'payment_method_types' => ['card'],
             'line_items' => $lineItems,
+            'mode' => 'payment',
             'success_url' => URL::getInstance()->absoluteUrl('/order/placed/' . $order->getId()),
             'cancel_url' => URL::getInstance()->absoluteUrl('/order/failed/' . $order->getId() . '/error'),
         ]);
@@ -538,5 +548,13 @@ class StripePayment extends AbstractPaymentModule
     public function manageStockOnCreation()
     {
         return false;
+    }
+
+    public static function configureServices(ServicesConfigurator $servicesConfigurator): void
+    {
+        $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
+            ->exclude([THELIA_MODULE_DIR . ucfirst(self::getModuleCode()). "/I18n/*"])
+            ->autowire(true)
+            ->autoconfigure(true);
     }
 }
