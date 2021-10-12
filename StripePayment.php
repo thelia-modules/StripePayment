@@ -42,8 +42,6 @@ class StripePayment extends AbstractPaymentModule
 {
     const MESSAGE_DOMAIN = "stripepayment";
     const CONFIRMATION_MESSAGE_NAME = "stripe_confirm_payment";
-    const STRIPE_VERSION_MIN = "7.0.0";
-    const STRIPE_VERSION_MAX = "7.0.0";
 
     const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
     const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
@@ -132,34 +130,6 @@ class StripePayment extends AbstractPaymentModule
                 Translator::getInstance()->trans(
                     "Stripe library is missing.",
                     [],
-                    self::MESSAGE_DOMAIN
-                )
-            );
-        }
-
-        $stripeVersion = \Stripe\Stripe::VERSION;
-
-        if (version_compare(self::STRIPE_VERSION_MIN, $stripeVersion) == 1) {
-            throw new \Exception(
-                Translator::getInstance()->trans(
-                    "Stripe version is lower than min version (%version). Current version: %curVersion.",
-                    [
-                        '%version' => self::STRIPE_VERSION_MIN,
-                        '%curVersion' => $stripeVersion
-                    ],
-                    self::MESSAGE_DOMAIN
-                )
-            );
-        }
-
-        if (version_compare(self::STRIPE_VERSION_MAX, $stripeVersion) < 1) {
-            throw new \Exception(
-                Translator::getInstance()->trans(
-                    "Stripe version is greater than max version (< %version). Current version: %curVersion.",
-                    [
-                        '%version' => self::STRIPE_VERSION_MAX,
-                        '%curVersion' => $stripeVersion
-                    ],
                     self::MESSAGE_DOMAIN
                 )
             );
