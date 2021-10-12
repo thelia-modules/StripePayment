@@ -4,7 +4,7 @@
   "type": "thelia-module",
   "require": {
     "thelia/installer": "~1.1",
-    "stripe/stripe-php": "v7.100.0"
+    "stripe/stripe-php": "^v7.100"
   },
   "extra": {
     "installer-name": "StripePayment"
