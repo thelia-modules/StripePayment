@@ -8,6 +8,7 @@ use StripePayment\StripePayment;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\ActionEvent;
 use Thelia\Core\Event\Cart\CartCreateEvent;
 use Thelia\Core\Event\Cart\CartEvent;
@@ -33,12 +34,12 @@ class CartEventListener implements EventSubscriberInterface
     protected $taxEngine;
 
     function __construct(
-        Request $request,
+        RequestStack $requestStack,
         EventDispatcherInterface $dispatcher,
         TaxEngine $taxEngine
     )
     {
-        $this->request = $request;
+        $this->request = $requestStack->getCurrentRequest();
         $this->dispatcher = $dispatcher;
         $this->taxEngine = $taxEngine;
     }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config xmlns="http://thelia.net/schema/dic/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://thelia.net/schema/dic/config http://thelia.net/schema/dic/config/thelia-1.0.xsd">
   <forms>
-    <form name="stripepayment.configuration" class="StripePayment\Form\StripePaymentConfigForm"/>
+    <form name="stripepayment_config_form" class="StripePayment\Form\StripePaymentConfigForm"/>
   </forms>
   <hooks>
     <hook id="stripepayment.hook" class="StripePayment\Hook\StripePaymentHook" scope="request">
@@ -11,8 +11,10 @@
       <tag name="hook.event_listener" event="order-invoice.after-javascript-include" type="front" method="declareStripeOnClickEvent"/>
       <tag name="hook.event_listener" event="main.after-javascript-include" type="front" method="includeStripeJsV3"/>
       <tag name="hook.event_listener" event="main.head-bottom" type="front" method="onMainHeadBottom"/>
+      <tag name="hook.event_listener" event="module.configuration" type="back" templates="render:stripepayment-configuration.html"/>
     </hook>
   </hooks>
+  <!--
   <services>
     <service id="stripepayment.cart.event_listener" class="StripePayment\EventListeners\CartEventListener" scope="request">
       <argument id="request" type="service"/>
@@ -21,4 +23,5 @@
       <tag name="kernel.event_subscriber"/>
     </service>
   </services>
+  -->
 </config>
