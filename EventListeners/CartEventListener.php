@@ -17,6 +17,7 @@ use Thelia\Core\Event\Currency\CurrencyChangeEvent;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Session\Session;
+use Thelia\Log\Tlog;
 use Thelia\Model\Cart;
 use Thelia\Model\Customer;
 use Thelia\Model\Order;
@@ -62,7 +63,8 @@ class CartEventListener implements EventSubscriberInterface
 
     public function createOrUpdatePaymentIntent(ActionEvent $event)
     {
-        Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
+        $secretKey = StripePayment::getConfigValue('secret_key');
+        Stripe::setApiKey($secretKey);
 
         /** @var Session $session */
         $session = $this->request->getSession();
@@ -88,12 +90,16 @@ class CartEventListener implements EventSubscriberInterface
 
             return;
         }
+        try {
+            /** @var PaymentIntent $payment */
+            $payment = PaymentIntent::create($paymentIntentValues);
 
-        /** @var PaymentIntent $payment */
-        $payment = PaymentIntent::create($paymentIntentValues);
+            $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, $payment->id);
+            $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, $payment->client_secret);
+        } catch (\Exception $exception){
+            Tlog::getInstance()->addAlert($exception->getMessage());
+        }
 
-        $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, $payment->id);
-        $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, $payment->client_secret);
         return;
     }
 
