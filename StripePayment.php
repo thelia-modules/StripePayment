@@ -346,7 +346,8 @@ class StripePayment extends AbstractPaymentModule
         $parser = $this->getContainer()->get("thelia.parser");
 
         $parser->setTemplateDefinition(
-            $parser->getTemplateHelper()->getActiveFrontTemplate()
+            $parser->getTemplateHelper()->getActiveFrontTemplate(),
+            true
         );
 
         $renderedTemplate = $parser->render(
