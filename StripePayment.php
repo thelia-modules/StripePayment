@@ -373,7 +373,7 @@ class StripePayment extends AbstractPaymentModule
     public function isValidPayment()
     {
         $secretKey = self::getConfigValue(self::SECRET_KEY);
-        return ( (($this->isDevEnvironment() || $this->isSslEnabled()) && $this->getConfigValue('enabled')) && $secretKey );
+        return ( (($this->isDevEnvironment() || $this->isSslEnabled()) && $this->getConfigValue('enabled')) && $secretKey && $this->getCurrentOrderTotalAmount() > 0);
     }
 
     /**
