@@ -61,22 +61,25 @@ class StripeWebHooksController extends BaseFrontController
                         // Unexpected event type
                         (new StripePaymentLog())->logText('Unexpected event type');
 
-                        return new Response('Unexpected event type', 400);
+                        return new Response('', 202);
                 }
 
-                return new Response('Success', 200);
+                return new Response('', 202);
             } catch (\UnexpectedValueException $e) {
                 // Invalid payload
                 (new StripePaymentLog())->logText($e->getMessage());
-                return new Response('Invalid payload', 400);
+                return new Response('', 202);
             } catch (SignatureVerification $e) {
-                return new Response($e->getMessage(), 400);
+                (new StripePaymentLog())->logText($e->getMessage());
+                return new Response('', 202);
             } catch (\Exception $e) {
-                return new Response($e->getMessage(), 404);
+                (new StripePaymentLog())->logText($e->getMessage());
+                return new Response('', 202);
             }
         }
 
-        return new Response('Bad request', 400);
+        (new StripePaymentLog())->logText('Bad request');
+        return new Response('', 202);
     }
 
     protected function handleSessionCompleted(Session $sessionCompleted)
