@@ -4,8 +4,6 @@ namespace StripePayment;
 
 use Propel\Runtime\ActiveQuery\Criteria;
 use Propel\Runtime\Connection\ConnectionInterface;
-use Stripe\Checkout\Session;
-use Stripe\Stripe;
 use StripePayment\Classes\StripePaymentException;
 use StripePayment\Classes\StripePaymentLog;
 use Symfony\Component\Config\Definition\Exception\Exception;
@@ -172,15 +170,14 @@ class StripePayment extends AbstractPaymentModule
                 $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
 
                 return;
-            }else{
-                $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
-
-                // Create the session on Stripe's servers - this will charge the user's order and save session id into order transaction reference
-                return $this->createStripeSession($order);
             }
 
+            $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
+            $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
+            $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
+
+            // Create the session on Stripe's servers - this will charge the user's order and save session id into order transaction reference
+            return $this->createStripeSession($order);
         } catch(\Stripe\Exception\CardException $e) {
             // The card has been declined
             // FIXME Translate message here
@@ -358,7 +355,7 @@ class StripePayment extends AbstractPaymentModule
             ]
         );
 
-        return Response::create($renderedTemplate);
+        return new Response($renderedTemplate);
     }
 
     /**
@@ -373,7 +370,7 @@ class StripePayment extends AbstractPaymentModule
     public function isValidPayment()
     {
         $secretKey = self::getConfigValue(self::SECRET_KEY);
-        return ( (($this->isDevEnvironment() || $this->isSslEnabled()) && $this->getConfigValue('enabled')) && $secretKey && $this->getCurrentOrderTotalAmount() > 0);
+        return ( (($this->isDevEnvironment() || $this->isSslEnabled()) && self::getConfigValue('enabled')) && $secretKey && $this->getCurrentOrderTotalAmount() > 0);
     }
 
     /**
@@ -383,7 +380,7 @@ class StripePayment extends AbstractPaymentModule
      */
     protected function isDevEnvironment()
     {
-        return 'dev' == $this->getContainer()->getParameter('kernel.environment');
+        return 'dev' === $this->getContainer()->getParameter('kernel.environment');
     }
 
     /**
@@ -461,9 +458,9 @@ class StripePayment extends AbstractPaymentModule
                     }
                 }
                 if($orderProduct->getWasInPromo()){
-                    $amount = $orderProduct->getPromoPrice() + $orderProduct->getVirtualColumn('TOTAL_PROMO_TAX');
+                    $amount = (float) $orderProduct->getPromoPrice() + (float) $orderProduct->getVirtualColumn('TOTAL_PROMO_TAX');
                 }else{
-                    $amount = $orderProduct->getPrice() + $orderProduct->getVirtualColumn('TOTAL_TAX');
+                    $amount = (float) $orderProduct->getPrice() + (float) $orderProduct->getVirtualColumn('TOTAL_TAX');
                 }
 
                 $stripeAmount += $amount * $orderProduct->getQuantity() * 100;
@@ -480,7 +477,7 @@ class StripePayment extends AbstractPaymentModule
         if ($order->getPostage()){
             if (null !== $module = ModuleQuery::create()->findPk($order->getDeliveryModuleId())){
                 $locale = $this->getRequest()->getLocale();
-                if ($locale == 'en') {
+                if ($locale === 'en') {
                     $locale = 'en_US';
                 }
                 $module->setLocale($locale);
