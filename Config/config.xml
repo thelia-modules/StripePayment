@@ -5,7 +5,7 @@
   </forms>
   <hooks>
     <hook id="stripepayment.hook" class="StripePayment\Hook\StripePaymentHook" scope="request">
-      <argument id="request" type="service"/>
+      <argument id="request_stack" type="service"/>
       <argument type="service" id="thelia.taxEngine"/>
       <tag name="hook.event_listener" event="order-invoice.payment-extra" type="front" method="includeStripe"/>
       <tag name="hook.event_listener" event="order-invoice.after-javascript-include" type="front" method="declareStripeOnClickEvent"/>

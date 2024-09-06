@@ -3,11 +3,13 @@
 namespace StripePayment\Hook;
 
 use StripePayment\StripePayment;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
-use Thelia\Core\HttpFoundation\Request;
+use Thelia\Core\Template\Assets\AssetResolverInterface;
 use Thelia\TaxEngine\TaxEngine;
+use TheliaSmarty\Template\SmartyParser;
 
 /**
  * Class StripePaymentHook
@@ -20,10 +22,11 @@ class StripePaymentHook extends BaseHook
 
     protected $taxEngine;
 
-    public function __construct(Request $request, TaxEngine $taxEngine)
+    public function __construct(RequestStack $requestStack, TaxEngine $taxEngine, SmartyParser $parser = null, AssetResolverInterface $resolver = null, EventDispatcherInterface $eventDispatcher = null)
     {
-        $this->request = $request;
+        $this->request = $requestStack->getCurrentRequest();
         $this->taxEngine = $taxEngine;
+        parent::__construct($parser, $resolver, $eventDispatcher);
     }
 
     public function includeStripe(HookRenderEvent $event)
