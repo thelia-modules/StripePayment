@@ -315,10 +315,14 @@ class StripePayment extends AbstractPaymentModule
         }
 
         $lineItems[] = [
-            'name'=> Translator::getInstance()->trans('Total', [], StripePayment::MESSAGE_DOMAIN ),
+            'price_data' => [
+                'currency' => strtolower($currency->getCode()),
+                'unit_amount' => round($order->getTotalAmount(), 2) * 100,
+                'product_data' => [
+                    'name' => Translator::getInstance()->trans('Total', [], StripePayment::MESSAGE_DOMAIN ),
+                ]
+            ],
             'quantity'=> 1,
-            'currency' => strtolower($currency->getCode()),
-            'amount' => round($order->getTotalAmount(), 2) * 100
         ];
 
         if(empty($lineItems)){
