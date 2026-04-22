@@ -11,7 +11,6 @@ use StripePayment\StripePayment;
 use Thelia\Controller\Admin\BaseAdminController;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Resource\AdminResources;
-use Thelia\Core\Template\ParserContext;
 use Thelia\Core\Translation\Translator;
 use Thelia\Form\Exception\FormValidationException;
 use Thelia\Tools\URL;
@@ -27,11 +26,13 @@ class StripePaymentConfigController extends BaseAdminController
     /**
      * @Route("", name="_save", methods="POST")
      */
-    public function saveAction(ParserContext $context)
+    public function saveAction()
     {
         if (null !== $response = $this->checkAuth([AdminResources::MODULE], ["stripepayment"], AccessManager::UPDATE)) {
             return $response;
         }
+
+        $context = $this->getParserContext();
 
         $baseForm = $this->createForm(StripePaymentConfigForm::getName());
 
