@@ -5,8 +5,8 @@ namespace StripePayment\Classes;
 /**
  * Writes Stripe-specific logs to a dedicated file, with size-based rotation.
  *
- * Does not touch the global Tlog singleton: each call writes directly to its
- * own file via fopen/flock/fwrite, leaving other Thelia loggers untouched.
+ * Does not touch the global Tlog singleton: each call appends directly to its
+ * own file with an exclusive lock, leaving other Thelia loggers untouched.
  */
 class StripePaymentLog
 {
@@ -27,7 +27,8 @@ class StripePaymentLog
     {
         $filePath = THELIA_LOG_DIR . self::FILE_NAME;
 
-        $this->rotateIfNeeded($filePath);
+        $rotated = $this->rotateIfNeeded($filePath);
+        $isNewFile = $rotated || !is_file($filePath);
 
         $line = sprintf(
             '[%s] %s.%s: %s%s',
@@ -39,18 +40,24 @@ class StripePaymentLog
         );
 
         @file_put_contents($filePath, $line, FILE_APPEND | LOCK_EX);
+
+        if ($isNewFile) {
+            @chmod($filePath, 0666);
+        }
     }
 
-    private function rotateIfNeeded(string $filePath): void
+    private function rotateIfNeeded(string $filePath): bool
     {
         if (!is_file($filePath) || filesize($filePath) <= self::MAX_FILE_SIZE_BYTES) {
-            return;
+            return false;
         }
 
         $timestamp = (new \DateTimeImmutable())->format('Y-m-d_H-i-s');
         @rename($filePath, $filePath.'.'.$timestamp);
 
         $this->cleanupBackups($filePath);
+
+        return true;
     }
 
     private function cleanupBackups(string $filePath): void

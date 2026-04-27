@@ -43,7 +43,11 @@ class StripeWebHooksController extends BaseFrontController
                 );
 
                 (new StripePaymentLog())->logText(
-                    sprintf('Received webhook event %s: %s', $event->type, serialize($event)),
+                    sprintf(
+                        'Received webhook event %s: %s',
+                        $event->type,
+                        json_encode($event->toArray(), \JSON_UNESCAPED_UNICODE)
+                    ),
                     StripePaymentLog::INFO
                 );
 

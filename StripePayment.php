@@ -267,18 +267,18 @@ class StripePayment extends AbstractPaymentModule
         } catch (StripePaymentException $e) {
             // Amount shown to the user by Stripe & order amount are not equal
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Amounts are different. Message: %s',
+                'Error paying order %d with Stripe. Amounts are different. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatException($e)
             );
 
             $userMessage = $e->getMessage();
         } catch (\Exception $e) {
             // Something else happened, completely unrelated to Stripe
             $logMessage = sprintf(
-                'Error paying order %d with Stripe but maybe unrelated with it. Message: %s',
+                'Error paying order %d with Stripe but maybe unrelated with it. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -309,6 +309,15 @@ class StripePayment extends AbstractPaymentModule
             $e->getHttpStatus() ?? 'n/a',
             $e->getRequestId() ?? 'n/a',
             json_encode($e->getJsonBody() ?? [], \JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    private static function formatException(\Throwable $e): string
+    {
+        return sprintf(
+            'message=%s trace=%s',
+            $e->getMessage(),
+            $e->getTraceAsString()
         );
     }
 
