@@ -48,6 +48,8 @@ class StripePaymentConfigController extends BaseAdminController
             StripePayment::setConfigValue(StripePayment::PUBLISHABLE_KEY, is_bool($data["publishable_key"]) ? (int) ($data["publishable_key"]) : $data["publishable_key"]);
             StripePayment::setConfigValue(StripePayment::WEBHOOKS_KEY, is_bool($data["webhooks_key"]) ? (int) ($data["webhooks_key"]) : $data["webhooks_key"]);
             StripePayment::setConfigValue(StripePayment::SECURE_URL, is_bool($data["secure_url"]) ? (int) ($data["secure_url"]) : $data["secure_url"]);
+            StripePayment::setConfigValue(StripePayment::STRIPE_PMC_TYPES_OVERRIDE, trim((string) ($data["payment_method_types_override"] ?? '')));
+            StripePayment::setConfigValue(StripePayment::CONFIG_PMC_ID, trim((string) ($data["payment_method_configuration_id"] ?? '')));
         } catch (FormValidationException $ex) {
             // Invalid data entered
             $errorMessage = $this->createStandardFormValidationErrorMessage($ex);

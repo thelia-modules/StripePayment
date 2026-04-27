@@ -52,6 +52,8 @@ class StripePayment extends AbstractPaymentModule
     const PUBLISHABLE_KEY = "publishable_key";
     const WEBHOOKS_KEY = "webhooks_key";
     const SECURE_URL = "secure_url";
+    const STRIPE_PMC_TYPES_OVERRIDE = "payment_method_types_override";
+    const CONFIG_PMC_ID = "payment_method_configuration_id";
 
     public function preActivation(ConnectionInterface $con = null)
     {

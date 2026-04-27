@@ -25,9 +25,13 @@ class StripePaymentConfigForm extends BaseStripePaymentConfigForm
             "publishable_key" => $this->translator->trans("Your publishable key (test or live)", [], StripePayment::MESSAGE_DOMAIN),
             "webhooks_key" => $this->translator->trans("Your webhooks key", [], StripePayment::MESSAGE_DOMAIN),
             "secure_url" => $this->translator->trans("Your chain of char for secure return webhook", [], StripePayment::MESSAGE_DOMAIN),
+            "payment_method_types_override" => $this->translator->trans("Payment method types override (CSV)", [], StripePayment::MESSAGE_DOMAIN),
+            "payment_method_configuration_id" => $this->translator->trans("Payment method configuration ID", [], StripePayment::MESSAGE_DOMAIN),
             "help.enabled" => $this->translator->trans("Do you want to activate Stripe Payment", [], StripePayment::MESSAGE_DOMAIN),
             "help.stripe_element" => $this->translator->trans("Element is the embedded and customizable payment form", [], StripePayment::MESSAGE_DOMAIN),
             "help.secret_key" => $this->translator->trans("You can see all your keys in your <a target=\"_blank\" href=\"https://dashboard.stripe.com/\">Stripe dashboard</a>. Also note that you can place your test or your live API keys", [], StripePayment::MESSAGE_DOMAIN),
+            "help.payment_method_types_override" => $this->translator->trans("Comma-separated Stripe payment method type identifiers (e.g. <code>card,twint</code>). When set, this overrides the Dashboard configuration. Highest priority.", [], StripePayment::MESSAGE_DOMAIN),
+            "help.payment_method_configuration_id" => $this->translator->trans("Stripe Payment Method Configuration ID (e.g. <code>pmc_xxx</code>). Used when the override field is empty. Falls back to the Dashboard default if both are empty.", [], StripePayment::MESSAGE_DOMAIN),
         );
     }
 }
