@@ -79,6 +79,21 @@ class StripePayment extends AbstractPaymentModule
         $this->createMailMessage();
     }
 
+    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
+    {
+        // Upgrades from <4.0 hard-coded payment_method_types=['card']. Preserve
+        // that behavior: only seed the override if the merchant has not chosen
+        // a Dashboard-driven setup (PMC id) and the override field is empty.
+        if (version_compare($currentVersion, '4.0.0', '<')) {
+            $existingOverride = (string) (self::getConfigValue(self::STRIPE_PMC_TYPES_OVERRIDE) ?? '');
+            $existingPmcId = (string) (self::getConfigValue(self::CONFIG_PMC_ID) ?? '');
+
+            if ($existingOverride === '' && $existingPmcId === '') {
+                self::setConfigValue(self::STRIPE_PMC_TYPES_OVERRIDE, 'card');
+            }
+        }
+    }
+
     public function createMailMessage()
     {
         // Create payment confirmation message from templates, if not already defined
