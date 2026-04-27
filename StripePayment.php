@@ -302,6 +302,39 @@ class StripePayment extends AbstractPaymentModule
         return new Response();
     }
 
+    /**
+     * Resolve the payment-method selection for a Stripe Checkout Session.
+     *
+     * Priority: explicit CSV override > Payment Method Configuration id > Dashboard default.
+     * When both fields are empty, no payment_method_types nor payment_method_configuration
+     * key is added so Stripe falls back to the Dashboard configuration.
+     */
+    private function applyPaymentMethodSelection(array $payload): array
+    {
+        $override = trim((string) (StripePayment::getConfigValue(StripePayment::STRIPE_PMC_TYPES_OVERRIDE) ?? ''));
+
+        if ($override !== '') {
+            $types = array_values(array_filter(
+                array_map('trim', explode(',', $override)),
+                static fn (string $type): bool => $type !== ''
+            ));
+
+            if ($types !== []) {
+                $payload['payment_method_types'] = $types;
+
+                return $payload;
+            }
+        }
+
+        $pmcId = trim((string) (StripePayment::getConfigValue(StripePayment::CONFIG_PMC_ID) ?? ''));
+
+        if ($pmcId !== '') {
+            $payload['payment_method_configuration'] = $pmcId;
+        }
+
+        return $payload;
+    }
+
     private static function formatStripeException(\Stripe\Exception\ApiErrorException $e): string
     {
         return sprintf(
@@ -357,12 +390,13 @@ class StripePayment extends AbstractPaymentModule
         $payload = [
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
-            'payment_method_types' => ['card'],
             'line_items' => $lineItems,
             'mode' => 'payment',
             'success_url' => URL::getInstance()->absoluteUrl('/order/placed/' . $order->getId()),
             'cancel_url' => URL::getInstance()->absoluteUrl('/order/failed/' . $order->getId() . '/error'),
         ];
+
+        $payload = $this->applyPaymentMethodSelection($payload);
 
         (new StripePaymentLog())->logText(
             sprintf(
