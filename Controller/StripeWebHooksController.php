@@ -42,7 +42,10 @@ class StripeWebHooksController extends BaseFrontController
                     $payload, $sigHeader, $endpointSecret
                 );
 
-                (new StripePaymentLog())->logText(serialize($event));
+                (new StripePaymentLog())->logText(
+                    sprintf('Received webhook event %s: %s', $event->type, serialize($event)),
+                    StripePaymentLog::INFO
+                );
 
                 // Handle the event
                 switch ($event->type) {
@@ -66,20 +69,32 @@ class StripeWebHooksController extends BaseFrontController
                         $this->handlePaymentIntentFail($paymentId, $dispatcher);
                         break;
                     default:
-                        // Unexpected event type
-                        (new StripePaymentLog())->logText('Unexpected event type');
+                        (new StripePaymentLog())->logText(
+                            sprintf('Unexpected webhook event type: %s', $event->type),
+                            StripePaymentLog::WARNING
+                        );
 
                         return new Response('Unexpected event type', 400);
                 }
 
                 return new Response('Success', 200);
             } catch (\UnexpectedValueException $e) {
-                // Invalid payload
-                (new StripePaymentLog())->logText($e->getMessage());
+                (new StripePaymentLog())->logText(
+                    sprintf('Invalid webhook payload: %s', $e->getMessage()),
+                    StripePaymentLog::ERROR
+                );
                 return new Response('Invalid payload', 400);
             } catch (SignatureVerification $e) {
+                (new StripePaymentLog())->logText(
+                    sprintf('Webhook signature verification failed: %s', $e->getMessage()),
+                    StripePaymentLog::ERROR
+                );
                 return new Response($e->getMessage(), 400);
             } catch (\Exception $e) {
+                (new StripePaymentLog())->logText(
+                    sprintf('Unexpected webhook error: %s', $e->getMessage()),
+                    StripePaymentLog::ERROR
+                );
                 return new Response($e->getMessage(), 404);
             }
         }
