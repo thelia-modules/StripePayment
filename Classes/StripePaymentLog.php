@@ -2,59 +2,70 @@
 
 namespace StripePayment\Classes;
 
-use Thelia\Log\Tlog;
-
 /**
- * Class StripePaymentLog
- * @package StripePayment\Classes
- * @author Etienne Perriere - OpenStudio <eperriere@openstudio.fr>
+ * Writes Stripe-specific logs to a dedicated file, with size-based rotation.
+ *
+ * Does not touch the global Tlog singleton: each call writes directly to its
+ * own file via fopen/flock/fwrite, leaving other Thelia loggers untouched.
  */
 class StripePaymentLog
 {
-    const EMERGENCY = 'EMERGENCY';
-    const ALERT     = 'ALERT';
-    const CRITICAL  = 'CRITICAL';
-    const ERROR     = 'ERROR';
-    const WARNING   = 'WARNING';
-    const NOTICE    = 'NOTICE';
-    const INFO      = 'INFO';
-    const DEBUG     = 'DEBUG';
-    const LOGCLASS = "\\Thelia\\Log\\Destination\\TlogDestinationFile";
+    public const EMERGENCY = 'EMERGENCY';
+    public const ALERT     = 'ALERT';
+    public const CRITICAL  = 'CRITICAL';
+    public const ERROR     = 'ERROR';
+    public const WARNING   = 'WARNING';
+    public const NOTICE    = 'NOTICE';
+    public const INFO      = 'INFO';
+    public const DEBUG     = 'DEBUG';
 
-    /** @var Tlog $log */
-    protected $log;
+    private const FILE_NAME = 'log-stripe.txt';
+    private const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+    private const MAX_BACKUP_COUNT = 10;
 
-    /**
-     * Log a message
-     *
-     * @param string $message  Message
-     * @param string $severity EMERGENCY|ALERT|CRITICAL|ERROR|WARNING|NOTICE|INFO|DEBUG
-     * @param string $category Category
-     */
-    public function logText($message, $severity = 'ALERT', $category = 'stripe')
+    public function logText(string $message, string $severity = self::INFO, string $category = 'stripe'): void
     {
-        $this->setTLogStripe();
-        $msg = "$category.$severity: $message";
-        $this->log->info($msg);
-        // Back to previous state
-        $this->getBackToPreviousState();
+        $filePath = THELIA_LOG_DIR . self::FILE_NAME;
+
+        $this->rotateIfNeeded($filePath);
+
+        $line = sprintf(
+            '[%s] %s.%s: %s%s',
+            (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            $category,
+            $severity,
+            $message,
+            PHP_EOL
+        );
+
+        @file_put_contents($filePath, $line, FILE_APPEND | LOCK_EX);
     }
 
-    /**
-     * @return Tlog
-     */
-    protected function setTLogStripe()
+    private function rotateIfNeeded(string $filePath): void
     {
-        /*
-         * Write Log
-         */
-        $this->log = Tlog::getInstance();
-        $this->log->setDestinations(self::LOGCLASS);
-        $this->log->setConfig(self::LOGCLASS, 0, THELIA_LOG_DIR . "log-stripe.txt");
+        if (!is_file($filePath) || filesize($filePath) <= self::MAX_FILE_SIZE_BYTES) {
+            return;
+        }
+
+        $timestamp = (new \DateTimeImmutable())->format('Y-m-d_H-i-s');
+        @rename($filePath, $filePath.'.'.$timestamp);
+
+        $this->cleanupBackups($filePath);
     }
 
-    protected function getBackToPreviousState()
+    private function cleanupBackups(string $filePath): void
     {
-        $this->log->setDestinations("\\Thelia\\Log\\Destination\\TlogDestinationRotatingFile");
+        $files = glob($filePath.'.*') ?: [];
+
+        if (count($files) <= self::MAX_BACKUP_COUNT) {
+            return;
+        }
+
+        usort($files, static fn (string $a, string $b): int => filemtime($a) <=> filemtime($b));
+
+        $excess = array_slice($files, 0, count($files) - self::MAX_BACKUP_COUNT);
+        foreach ($excess as $file) {
+            @unlink($file);
+        }
     }
 }
