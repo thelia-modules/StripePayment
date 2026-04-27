@@ -50,7 +50,7 @@ class StripePaymentLog
          */
         $this->log = Tlog::getInstance();
         $this->log->setDestinations(self::LOGCLASS);
-        $this->log->setConfig(self::LOGCLASS, 0, THELIA_ROOT . "log" . DS . "log-stripe.txt");
+        $this->log->setConfig(self::LOGCLASS, 0, THELIA_LOG_DIR . "log-stripe.txt");
     }
 
     protected function getBackToPreviousState()
