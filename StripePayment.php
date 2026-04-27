@@ -182,9 +182,9 @@ class StripePayment extends AbstractPaymentModule
             // The card has been declined
             // FIXME Translate message here
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Card declined. Message: %s',
+                'Error paying order %d with Stripe. Card declined. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatStripeException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -196,9 +196,9 @@ class StripePayment extends AbstractPaymentModule
         } catch (\Stripe\Exception\RateLimitException $e) {
             // Too many requests made to the API too quickly
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Too many requests. Message: %s',
+                'Error paying order %d with Stripe. Too many requests. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatStripeException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -210,9 +210,9 @@ class StripePayment extends AbstractPaymentModule
         } catch (\Stripe\Exception\InvalidRequestException $e) {
             // Invalid parameters were supplied to Stripe's API
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Invalid parameters. Message: %s',
+                'Error paying order %d with Stripe. Invalid parameters. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatStripeException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -225,9 +225,9 @@ class StripePayment extends AbstractPaymentModule
             // Authentication with Stripe's API failed
             // (maybe you changed API keys recently)
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Authentication failed: API key changed? Message: %s',
+                'Error paying order %d with Stripe. Authentication failed: API key changed? %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatStripeException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -239,9 +239,9 @@ class StripePayment extends AbstractPaymentModule
         } catch (\Stripe\Exception\ApiConnectionException $e) {
             // Network communication with Stripe failed
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Network communication failed. Message: %s',
+                'Error paying order %d with Stripe. Network communication failed. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatStripeException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -253,9 +253,9 @@ class StripePayment extends AbstractPaymentModule
         } catch (\Stripe\Exception\ApiErrorException $e) {
             // Display a very generic error to the user
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Message: %s',
+                'Error paying order %d with Stripe. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatStripeException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -267,18 +267,18 @@ class StripePayment extends AbstractPaymentModule
         } catch (StripePaymentException $e) {
             // Amount shown to the user by Stripe & order amount are not equal
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Amounts are different. Message: %s',
+                'Error paying order %d with Stripe. Amounts are different. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatException($e)
             );
 
             $userMessage = $e->getMessage();
         } catch (\Exception $e) {
             // Something else happened, completely unrelated to Stripe
             $logMessage = sprintf(
-                'Error paying order %d with Stripe but maybe unrelated with it. Message: %s',
+                'Error paying order %d with Stripe but maybe unrelated with it. %s',
                 $order->getId(),
-                $e->getMessage()
+                self::formatException($e)
             );
 
             $userMessage = Translator::getInstance()
@@ -290,7 +290,7 @@ class StripePayment extends AbstractPaymentModule
         }
 
         if ($logMessage !== NULL) {
-            (new StripePaymentLog())->logText($logMessage);
+            (new StripePaymentLog())->logText($logMessage, StripePaymentLog::ERROR);
 
             return new RedirectResponse(
                 URL::getInstance()->absoluteUrl("/order/failed/".$order->getId()."/".$userMessage)
@@ -298,6 +298,27 @@ class StripePayment extends AbstractPaymentModule
         }
 
         return new Response();
+    }
+
+    private static function formatStripeException(\Stripe\Exception\ApiErrorException $e): string
+    {
+        return sprintf(
+            'message=%s code=%s http_status=%s request_id=%s body=%s',
+            $e->getMessage(),
+            $e->getStripeCode() ?? 'n/a',
+            $e->getHttpStatus() ?? 'n/a',
+            $e->getRequestId() ?? 'n/a',
+            json_encode($e->getJsonBody() ?? [], \JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    private static function formatException(\Throwable $e): string
+    {
+        return sprintf(
+            'message=%s trace=%s',
+            $e->getMessage(),
+            $e->getTraceAsString()
+        );
     }
 
     public function createStripeSession(OrderModel $order)
@@ -331,7 +352,7 @@ class StripePayment extends AbstractPaymentModule
 
         $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
 
-        $session = $stripe->checkout->sessions->create([
+        $payload = [
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
             'payment_method_types' => ['card'],
@@ -339,7 +360,18 @@ class StripePayment extends AbstractPaymentModule
             'mode' => 'payment',
             'success_url' => URL::getInstance()->absoluteUrl('/order/placed/' . $order->getId()),
             'cancel_url' => URL::getInstance()->absoluteUrl('/order/failed/' . $order->getId() . '/error'),
-        ]);
+        ];
+
+        (new StripePaymentLog())->logText(
+            sprintf(
+                'Creating Stripe Checkout session for order %d. payload=%s',
+                $order->getId(),
+                json_encode($payload, \JSON_UNESCAPED_UNICODE)
+            ),
+            StripePaymentLog::INFO
+        );
+
+        $session = $stripe->checkout->sessions->create($payload);
 
         $order->setTransactionRef($session->payment_intent)->save();
 
