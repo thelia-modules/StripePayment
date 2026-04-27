@@ -3,7 +3,7 @@
 namespace StripePayment\Controller;
 
 use Stripe\Checkout\Session;
-use Stripe\Error\SignatureVerification;
+use Stripe\Exception\SignatureVerificationException;
 use Stripe\Stripe;
 use Stripe\Webhook;
 use StripePayment\Classes\StripePaymentLog;
@@ -88,7 +88,7 @@ class StripeWebHooksController extends BaseFrontController
                     StripePaymentLog::ERROR
                 );
                 return new Response('Invalid payload', 400);
-            } catch (SignatureVerification $e) {
+            } catch (SignatureVerificationException $e) {
                 (new StripePaymentLog())->logText(
                     sprintf('Webhook signature verification failed: %s', $e->getMessage()),
                     StripePaymentLog::ERROR
