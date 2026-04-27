@@ -11,6 +11,8 @@ use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Thelia\Form\BaseForm;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\Regex;
 
 /**
  * Class StripePaymentConfigForm
@@ -53,6 +55,8 @@ class StripePaymentConfigForm extends BaseForm
         $this->addPublishableKeyField($translationKeys, $fieldsIdKeys);
         $this->addWebhooksKeyField($translationKeys, $fieldsIdKeys);
         $this->addSecureUrlField($translationKeys, $fieldsIdKeys);
+        $this->addPaymentMethodTypesOverrideField($translationKeys, $fieldsIdKeys);
+        $this->addPaymentMethodConfigurationIdField($translationKeys, $fieldsIdKeys);
     }
 
     protected function addEnabledField(array $translationKeys, array $fieldsIdKeys)
@@ -176,6 +180,45 @@ class StripePaymentConfigForm extends BaseForm
         ;
     }
 
+    protected function addPaymentMethodTypesOverrideField(array $translationKeys, array $fieldsIdKeys)
+    {
+        $this->formBuilder
+            ->add("payment_method_types_override", TextType::class, array(
+                "label" => $this->readKey("payment_method_types_override", $translationKeys),
+                "label_attr" => [
+                    "for" => $this->readKey("payment_method_types_override", $fieldsIdKeys),
+                    "help" => $this->readKey("help.payment_method_types_override", $translationKeys)
+                ],
+                "required" => false,
+                "constraints" => array(
+                    new Regex([
+                        'pattern' => '/^[a-z0-9_]+(\s*,\s*[a-z0-9_]+)*$/',
+                        'message' => 'Comma-separated list of Stripe payment method type identifiers (e.g. "card,twint").',
+                    ]),
+                ),
+                "data" => StripePayment::getConfigValue(StripePayment::STRIPE_PMC_TYPES_OVERRIDE),
+            ))
+        ;
+    }
+
+    protected function addPaymentMethodConfigurationIdField(array $translationKeys, array $fieldsIdKeys)
+    {
+        $this->formBuilder
+            ->add("payment_method_configuration_id", TextType::class, array(
+                "label" => $this->readKey("payment_method_configuration_id", $translationKeys),
+                "label_attr" => [
+                    "for" => $this->readKey("payment_method_configuration_id", $fieldsIdKeys),
+                    "help" => $this->readKey("help.payment_method_configuration_id", $translationKeys)
+                ],
+                "required" => false,
+                "constraints" => array(
+                    new Length(['max' => 100]),
+                ),
+                "data" => StripePayment::getConfigValue(StripePayment::CONFIG_PMC_ID),
+            ))
+        ;
+    }
+
     public static function getName()
     {
         return static::FORM_NAME;
@@ -202,7 +245,9 @@ class StripePaymentConfigForm extends BaseForm
             "secret_key" => "secret_key",
             "publishable_key" => "publishable_key",
             "webhooks_key" => "webhooks_key",
-            "secure_url" => "secure_url"
+            "secure_url" => "secure_url",
+            "payment_method_types_override" => "payment_method_types_override",
+            "payment_method_configuration_id" => "payment_method_configuration_id",
         );
     }
 }

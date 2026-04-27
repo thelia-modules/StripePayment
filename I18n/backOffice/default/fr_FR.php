@@ -11,6 +11,8 @@ return array(
     'The configuration value secret_key' => 'La valeur de configuration "secret_key"',
     'The configuration value secure_url' => 'La valeur de configuration secure_url',
     'The configuration value webhooks_key whsec_...' => 'La valeur de configuration webhooks_key whsec_...',
+    'The configuration value payment_method_types_override' => 'card,twint (laisser vide pour utiliser le Dashboard Stripe)',
+    'The configuration value payment_method_configuration_id' => 'pmc_xxx (laisser vide pour utiliser le Dashboard Stripe)',
     'Webhooks endpoint url' => 'URL d\'endpoint WebHook',
     'Webhooks event to activate' => 'Événements WebHook à activer',
     'active stripe element' => 'Activer Stripe Element',

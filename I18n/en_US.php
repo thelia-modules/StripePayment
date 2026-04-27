@@ -18,4 +18,8 @@ return array(
     'Your card has been declined.' => 'Your card has been declined.',
     'Your publishable key (test or live)' => 'Your publishable key (test or live)',
     'Your secret key' => 'Your secret key',
+    'Payment method types override (CSV)' => 'Payment method types override (CSV)',
+    'Payment method configuration ID' => 'Payment method configuration ID',
+    'Comma-separated Stripe payment method type identifiers (e.g. <code>card,twint</code>). When set, this overrides the Dashboard configuration. Highest priority.' => 'Comma-separated Stripe payment method type identifiers (e.g. <code>card,twint</code>). When set, this overrides the Dashboard configuration. Highest priority.',
+    'Stripe Payment Method Configuration ID (e.g. <code>pmc_xxx</code>). Used when the override field is empty. Falls back to the Dashboard default if both are empty.' => 'Stripe Payment Method Configuration ID (e.g. <code>pmc_xxx</code>). Used when the override field is empty. Falls back to the Dashboard default if both are empty.',
 );

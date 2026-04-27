@@ -26,4 +26,8 @@ return array(
     'Your publishable key (test or live)' => 'Votre clé publique',
     'Your secret key' => 'Votre clé secrète',
     'Your webhooks key' => 'Votre clé Webhooks ?',
+    'Payment method types override (CSV)' => 'Surcharge des moyens de paiement (CSV)',
+    'Payment method configuration ID' => 'ID de configuration des moyens de paiement',
+    'Comma-separated Stripe payment method type identifiers (e.g. <code>card,twint</code>). When set, this overrides the Dashboard configuration. Highest priority.' => 'Liste CSV des identifiants de moyens de paiement Stripe (par ex. <code>card,twint</code>). Si renseigné, surcharge la configuration du Dashboard. Priorité maximale.',
+    'Stripe Payment Method Configuration ID (e.g. <code>pmc_xxx</code>). Used when the override field is empty. Falls back to the Dashboard default if both are empty.' => 'ID Stripe de configuration des moyens de paiement (par ex. <code>pmc_xxx</code>). Utilisé si la surcharge CSV est vide. Si tout est vide, le Dashboard pilote la liste.',
 );

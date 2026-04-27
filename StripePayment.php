@@ -52,6 +52,8 @@ class StripePayment extends AbstractPaymentModule
     const PUBLISHABLE_KEY = "publishable_key";
     const WEBHOOKS_KEY = "webhooks_key";
     const SECURE_URL = "secure_url";
+    const STRIPE_PMC_TYPES_OVERRIDE = "payment_method_types_override";
+    const CONFIG_PMC_ID = "payment_method_configuration_id";
 
     public function preActivation(ConnectionInterface $con = null)
     {
@@ -75,6 +77,21 @@ class StripePayment extends AbstractPaymentModule
         }
 
         $this->createMailMessage();
+    }
+
+    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
+    {
+        // Upgrades from <4.0 hard-coded payment_method_types=['card']. Preserve
+        // that behavior: only seed the override if the merchant has not chosen
+        // a Dashboard-driven setup (PMC id) and the override field is empty.
+        if (version_compare($currentVersion, '4.0.0', '<')) {
+            $existingOverride = (string) (self::getConfigValue(self::STRIPE_PMC_TYPES_OVERRIDE) ?? '');
+            $existingPmcId = (string) (self::getConfigValue(self::CONFIG_PMC_ID) ?? '');
+
+            if ($existingOverride === '' && $existingPmcId === '') {
+                self::setConfigValue(self::STRIPE_PMC_TYPES_OVERRIDE, 'card');
+            }
+        }
     }
 
     public function createMailMessage()
@@ -300,6 +317,39 @@ class StripePayment extends AbstractPaymentModule
         return new Response();
     }
 
+    /**
+     * Resolve the payment-method selection for a Stripe Checkout Session.
+     *
+     * Priority: explicit CSV override > Payment Method Configuration id > Dashboard default.
+     * When both fields are empty, no payment_method_types nor payment_method_configuration
+     * key is added so Stripe falls back to the Dashboard configuration.
+     */
+    private function applyPaymentMethodSelection(array $payload): array
+    {
+        $override = trim((string) (StripePayment::getConfigValue(StripePayment::STRIPE_PMC_TYPES_OVERRIDE) ?? ''));
+
+        if ($override !== '') {
+            $types = array_values(array_filter(
+                array_map('trim', explode(',', $override)),
+                static fn (string $type): bool => $type !== ''
+            ));
+
+            if ($types !== []) {
+                $payload['payment_method_types'] = $types;
+
+                return $payload;
+            }
+        }
+
+        $pmcId = trim((string) (StripePayment::getConfigValue(StripePayment::CONFIG_PMC_ID) ?? ''));
+
+        if ($pmcId !== '') {
+            $payload['payment_method_configuration'] = $pmcId;
+        }
+
+        return $payload;
+    }
+
     private static function formatStripeException(\Stripe\Exception\ApiErrorException $e): string
     {
         return sprintf(
@@ -355,12 +405,13 @@ class StripePayment extends AbstractPaymentModule
         $payload = [
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
-            'payment_method_types' => ['card'],
             'line_items' => $lineItems,
             'mode' => 'payment',
             'success_url' => URL::getInstance()->absoluteUrl('/order/placed/' . $order->getId()),
             'cancel_url' => URL::getInstance()->absoluteUrl('/order/failed/' . $order->getId() . '/error'),
         ];
+
+        $payload = $this->applyPaymentMethodSelection($payload);
 
         (new StripePaymentLog())->logText(
             sprintf(
