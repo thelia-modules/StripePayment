@@ -14,18 +14,16 @@ use Thelia\Core\Security\Resource\AdminResources;
 use Thelia\Core\Translation\Translator;
 use Thelia\Form\Exception\FormValidationException;
 use Thelia\Tools\URL;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * @Route("/admin/module/StripePayment", name="stripe_payment_config")
  * Class StripePaymentConfigController
  * @package StripePayment\Controller
  */
+#[Route('/admin/module/StripePayment', name: 'stripe_payment_config')]
 class StripePaymentConfigController extends BaseAdminController
 {
-    /**
-     * @Route("", name="_save", methods="POST")
-     */
+    #[Route('', name: '_save', methods: ['POST'])]
     public function saveAction()
     {
         if (null !== $response = $this->checkAuth([AdminResources::MODULE], ["stripepayment"], AccessManager::UPDATE)) {
@@ -71,6 +69,12 @@ class StripePaymentConfigController extends BaseAdminController
             $context
                 ->set("success", true)
             ;
+
+            // Migration Thelia 3 : ce controleur redirige toujours vers l'ecran de configuration
+            // (module.configuration, rendu en Twig par StripePaymentHook::renderConfigurationScreen()).
+            // Le flag ci-dessus, stocke sur le ParserContext en memoire, ne survit pas a la redirection ;
+            // le message de succes doit donc transiter par la session (flash), lue par le hook.
+            $this->getSession()->getFlashBag()->add('stripepayment_success', true);
         }
 
         return $this->generateRedirect(URL::getInstance()->absoluteUrl('/admin/module/StripePayment'));

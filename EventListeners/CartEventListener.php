@@ -21,26 +21,28 @@ use Thelia\Log\Tlog;
 use Thelia\Model\Cart;
 use Thelia\Model\Customer;
 use Thelia\Model\Order;
-use Thelia\TaxEngine\TaxEngine;
+use Thelia\Domain\Taxation\TaxEngine\TaxEngine;
 
 class CartEventListener implements EventSubscriberInterface
 {
-    /** @var Request  */
-    protected $request;
-
-    /** @var EventDispatcherInterface  */
+    /** @var EventDispatcherInterface */
     protected $dispatcher;
 
     /** @var TaxEngine */
     protected $taxEngine;
 
+    /** @var RequestStack */
+    protected $requestStack;
+
+    // La requête est résolue à l'appel : le service est construit une seule fois
+    // et une capture au constructeur pointerait vers une requête obsolète en mode worker.
     function __construct(
         RequestStack $requestStack,
         EventDispatcherInterface $dispatcher,
         TaxEngine $taxEngine
     )
     {
-        $this->request = $requestStack->getCurrentRequest();
+        $this->requestStack = $requestStack;
         $this->dispatcher = $dispatcher;
         $this->taxEngine = $taxEngine;
     }
@@ -67,7 +69,7 @@ class CartEventListener implements EventSubscriberInterface
         Stripe::setApiKey($secretKey);
 
         /** @var Session $session */
-        $session = $this->request->getSession();
+        $session = $this->requestStack->getCurrentRequest()->getSession();
 
         $paymentIntentValues = $this->getPaymentIntentValues($event);
 
@@ -107,7 +109,7 @@ class CartEventListener implements EventSubscriberInterface
     protected function getPaymentIntentValues(ActionEvent $event)
     {
         /** @var Session $session */
-        $session = $this->request->getSession();
+        $session = $this->requestStack->getCurrentRequest()->getSession();
         $currency = $session->getCurrency();
 
         $data  = $this->getCartAndOrderFromEvent($event);
@@ -170,7 +172,7 @@ class CartEventListener implements EventSubscriberInterface
     protected function getCartAndOrderFromEvent(ActionEvent $event)
     {
         /** @var Session $session */
-        $session = $this->request->getSession();
+        $session = $this->requestStack->getCurrentRequest()->getSession();
 
         if ($event instanceof CartRestoreEvent) {
             return [

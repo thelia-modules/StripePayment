@@ -219,7 +219,7 @@ class StripePaymentConfigForm extends BaseForm
         ;
     }
 
-    public static function getName()
+    public static function getName(): string
     {
         return static::FORM_NAME;
     }
