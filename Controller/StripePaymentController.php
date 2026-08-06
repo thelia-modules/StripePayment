@@ -17,8 +17,7 @@ class StripePaymentController extends BasePaymentModuleController
      *
      * @return string the module code
      */
-    protected function getModuleCode()
-    {
+    protected function getModuleCode(): string {
         return 'StripePayment';
     }
 }

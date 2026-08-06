@@ -9,34 +9,37 @@ use Stripe\Webhook;
 use StripePayment\Classes\StripePaymentLog;
 use StripePayment\StripePayment;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Attribute\Route;
 use Thelia\Controller\Front\BaseFrontController;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
-use Thelia\Core\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response;
 use Thelia\Model\OrderQuery;
 use Thelia\Model\OrderStatusQuery;
-use Symfony\Component\Routing\Annotation\Route;
 
-/**
- * @Route("/module/StripePayment/stripe_webhook", name="stripe_webhook")
- */
+#[Route('/module/StripePayment/stripe_webhook', name: 'stripe_webhook')]
 class StripeWebHooksController extends BaseFrontController
 {
-    /**
-     * @Route("/{secure_url}/listen", name="_listen")
-     */
-    public function listenAction($secure_url, EventDispatcherInterface $dispatcher)
+    #[Route('/{secure_url}/listen', name: '_listen', requirements: ['secure_url' => '.*'])]
+    public function listenAction($secure_url, EventDispatcherInterface $dispatcher, Request $request)
     {
-        if (StripePayment::getConfigValue('secure_url') == $secure_url) {
+        if (hash_equals((string) StripePayment::getConfigValue('secure_url'), (string) $secure_url)) {
             try {
                 Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
 
                 // You can find your endpoint's secret in your webhook settings
                 $endpointSecret = StripePayment::getConfigValue('webhooks_key');
 
-                $payload = file_get_contents('php://input');
-                $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'];
-                $event = null;
+                $payload = $request->getContent();
+                // Lecture par l'objet Request plutot que par $_SERVER : un appel sans
+                // en-tete de signature renvoie desormais 400 au lieu de provoquer une
+                // ErrorException (« Undefined array key ») transformee en 500.
+                $sigHeader = $request->headers->get('stripe-signature');
+
+                if (null === $sigHeader) {
+                    return new Response('Missing Stripe signature header', 400);
+                }
 
                 $event = Webhook::constructEvent(
                     $payload, $sigHeader, $endpointSecret

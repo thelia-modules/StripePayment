@@ -42,7 +42,7 @@ class StripePaymentLog
         @file_put_contents($filePath, $line, FILE_APPEND | LOCK_EX);
 
         if ($isNewFile) {
-            @chmod($filePath, 0666);
+            @chmod($filePath, 0644);
         }
     }
 

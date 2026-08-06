@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurat
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Thelia\Core\Event\Image\ImageEvent;
 use Thelia\Core\Event\TheliaEvents;
-use Thelia\Core\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response;
 use Thelia\Core\Template\ParserInterface;
 use Thelia\Core\Translation\Translator;
 use Thelia\Log\Tlog;
@@ -55,7 +55,7 @@ class StripePayment extends AbstractPaymentModule
     const STRIPE_PMC_TYPES_OVERRIDE = "payment_method_types_override";
     const CONFIG_PMC_ID = "payment_method_configuration_id";
 
-    public function preActivation(ConnectionInterface $con = null)
+    public function preActivation(?ConnectionInterface $con = null): bool
     {
         // Check if Stripe API is present
         try {
@@ -67,19 +67,28 @@ class StripePayment extends AbstractPaymentModule
         return true;
     }
 
-    public function postActivation(ConnectionInterface $con = null): void
+    public function postActivation(?ConnectionInterface $con = null): void
     {
+        // Le seed de la table `message` reste volontairement HORS de la garde
+        // d'idempotence : un message d'email supprime en base doit pouvoir etre
+        // recree par une simple reactivation du module.
+        $this->createMailMessage();
+
+        if (self::getConfigValue('is_initialized', false)) {
+            return;
+        }
+
         // Module image
         $moduleModel = $this->getModuleModel();
 
-        if (! $moduleModel->isModuleImageDeployed($con)) {
+        if (!$moduleModel->isModuleImageDeployed($con)) {
             $this->deployImageFolder($moduleModel, sprintf('%s'.DS.'Resource'.DS.'images'.DS.'module', __DIR__), $con);
         }
 
-        $this->createMailMessage();
+        self::setConfigValue('is_initialized', true);
     }
 
-    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
+    public function update($currentVersion, $newVersion, ?ConnectionInterface $con = null): void
     {
         // Upgrades from <4.0 hard-coded payment_method_types=['card']. Preserve
         // that behavior: only seed the override if the merchant has not chosen
@@ -155,16 +164,16 @@ class StripePayment extends AbstractPaymentModule
      *
      *  Method used by payment gateway.
      *
-     *  If this method return a \Thelia\Core\HttpFoundation\Response instance, this response is send to the
+     *  If this method return a \Symfony\Component\HttpFoundation\Response instance, this response is send to the
      *  browser.
      *
      *  In many cases, it's necessary to send a form to the payment gateway. On your response you can return this form already
      *  completed, ready to be sent
      *
      * @param  \Thelia\Model\Order $order processed order
-     * @return null|\Thelia\Core\HttpFoundation\Response
+     * @return null|\Symfony\Component\HttpFoundation\Response
      */
-    public function pay(Order $order)
+    public function pay(Order $order): ?\Symfony\Component\HttpFoundation\Response
     {
         if (!$this->isValidPayment()) {
             throw new Exception("Your connection is not secured. Check that 'https' is present at the beginning of the site's address.");
@@ -388,7 +397,7 @@ class StripePayment extends AbstractPaymentModule
         $lineItems[] = [
             'price_data' => [
                 'currency' => strtolower($currency->getCode()),
-                'unit_amount' => round($order->getTotalAmount(), 2) * 100,
+                'unit_amount' => (int) round($order->getTotalAmount() * 100),
                 'product_data' => [
                     'name' => Translator::getInstance()->trans('Total', [], StripePayment::MESSAGE_DOMAIN ),
                 ]
@@ -454,7 +463,7 @@ class StripePayment extends AbstractPaymentModule
      *
      * @return boolean
      */
-    public function isValidPayment()
+    public function isValidPayment(): bool
     {
         $secretKey = self::getConfigValue(self::SECRET_KEY);
         return ( (($this->isDevEnvironment() || $this->isSslEnabled()) && self::getConfigValue('enabled')) && $secretKey && $this->getCurrentOrderTotalAmount() > 0);
@@ -601,7 +610,7 @@ class StripePayment extends AbstractPaymentModule
      *
      * @return bool
      */
-    public function manageStockOnCreation()
+    public function manageStockOnCreation(): bool
     {
         return false;
     }
@@ -609,7 +618,12 @@ class StripePayment extends AbstractPaymentModule
     public static function configureServices(ServicesConfigurator $servicesConfigurator): void
     {
         $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
-            ->exclude([THELIA_MODULE_DIR . ucfirst(self::getModuleCode()). "/I18n/*"])
+            ->exclude([
+                __DIR__.'/I18n',
+                __DIR__.'/Config',
+                __DIR__.'/Tests',
+                __FILE__,
+            ])
             ->autowire(true)
             ->autoconfigure(true);
     }

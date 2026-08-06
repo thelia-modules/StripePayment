@@ -1,0 +1,96 @@
+{# Fragment rendu par le hook `module.configuration` (StripePaymentHook::renderConfigurationScreen).
+   Pas de `extends` : ce gabarit est injecte dans le contenu de la page cœur
+   `module/configure.html.twig`, qui fournit deja le titre, le fil d'Ariane et le conteneur.
+
+   Le FormView est recupere directement ici via la fonction Twig `getForm()` (module TwigEngine) :
+   le service `stripepayment.hook` est declare dans Config/config.xml avec une liste d'arguments
+   figee et sans autowiring (hors perimetre de cette migration), donc `TheliaFormFactory` et
+   `ParserContext` ne sont pas injectables dans le Hook. `getForm()` s'execute dans l'environnement
+   Twig (pleinement autowire) et reproduit exactement le comportement du tag Smarty {form} :
+   formulaire vierge, ou formulaire rejoue depuis la session s'il y a eu une erreur de validation. #}
+<div class="card" data-testid="stripepayment-configuration">
+    <div class="card-body">
+        <h2 class="h5 mb-3">{{ 'Configure stripepayment'|trans({}, 'stripepayment.bo.default') }}</h2>
+
+        {% if success_message %}
+            <div class="alert alert-success" data-testid="stripepayment-success">{{ success_message }}</div>
+        {% endif %}
+
+        {% set form = getForm('stripepayment_config_form') %}
+
+        {% form_theme form with bo_form_themes only %}
+
+        {% if form.vars.errors|length > 0 %}
+            <div class="alert alert-danger" data-testid="stripepayment-error">{{ form_errors(form) }}</div>
+        {% endif %}
+
+        {{ form_start(form, { action: save_url, method: 'post', attr: { 'data-testid': 'stripepayment-config-form' } }) }}
+
+            {# Migration Thelia 3 : StripePaymentConfigForm (Form/Base/**, hors perimetre) definit ces
+               3 champs avec l'option "value" (utilisee par le plugin Smarty {form_field} d'origine
+               pour l'etat coche) et non "data" (utilisee par le rendu Symfony/Twig standard). Sans
+               correction, `form_widget()` afficherait toujours les cases decochees quelle que soit la
+               configuration enregistree. On force donc l'etat "checked" depuis `vars.value`, qui
+               contient bien la valeur stockee ("1"/"0"). #}
+            <div class="form-check mb-3">
+                {{ form_widget(form.enabled, { checked: form.enabled.vars.value }) }}
+                <label class="form-check-label" for="{{ form.enabled.vars.id }}">{{ form.enabled.vars.label }}</label>
+                {% if form.enabled.vars.label_attr.help is defined %}
+                    <div class="form-text">{{ form.enabled.vars.label_attr.help|raw }}</div>
+                {% endif %}
+                {{ form_errors(form.enabled) }}
+            </div>
+
+            <div class="form-check mb-3">
+                {{ form_widget(form.stripe_element, { checked: form.stripe_element.vars.value }) }}
+                <label class="form-check-label" for="{{ form.stripe_element.vars.id }}">{{ form.stripe_element.vars.label }}</label>
+                {% if form.stripe_element.vars.label_attr.help is defined %}
+                    <div class="form-text">{{ form.stripe_element.vars.label_attr.help|raw }}</div>
+                {% endif %}
+                {{ form_errors(form.stripe_element) }}
+            </div>
+
+            <div class="form-check mb-3">
+                {{ form_widget(form.one_click_payment, { checked: form.one_click_payment.vars.value }) }}
+                <label class="form-check-label" for="{{ form.one_click_payment.vars.id }}">{{ form.one_click_payment.vars.label }}</label>
+                {{ form_errors(form.one_click_payment) }}
+            </div>
+
+            {% for fieldName in ['secret_key', 'publishable_key', 'webhooks_key', 'secure_url', 'payment_method_types_override', 'payment_method_configuration_id'] %}
+                {% set field = form[fieldName] %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ field.vars.id }}">
+                        {{ field.vars.label }}
+                        {% if field.vars.required %}<span class="text-danger">*</span>{% endif %}
+                    </label>
+                    {{ form_widget(field) }}
+                    {% if field.vars.label_attr.help is defined %}
+                        <div class="form-text">{{ field.vars.label_attr.help|raw }}</div>
+                    {% endif %}
+                    {{ form_errors(field) }}
+                </div>
+            {% endfor %}
+
+            <div class="mb-3">
+                <label class="form-label" for="stripepayment-webhook-url">{{ 'Webhooks endpoint url'|trans({}, 'stripepayment.bo.default') }}</label>
+                <input id="stripepayment-webhook-url" type="text" class="form-control" disabled value="{{ webhook_url }}" data-testid="stripepayment-webhook-url">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">{{ 'Webhooks event to activate'|trans({}, 'stripepayment.bo.default') }}</label>
+                <ul class="mb-0">
+                    <li>payment_intent.payment_failed</li>
+                    <li>payment_intent.succeeded</li>
+                    <li>checkout.session.completed</li>
+                </ul>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <a href="{{ close_url }}" class="btn btn-outline-secondary">{{ 'Cancel'|trans }}</a>
+                <button type="submit" class="btn btn-primary" data-testid="stripepayment-config-save">
+                    <i class="bi bi-check2" aria-hidden="true"></i> {{ 'Save'|trans }}
+                </button>
+            </div>
+        {{ form_end(form) }}
+    </div>
+</div>
