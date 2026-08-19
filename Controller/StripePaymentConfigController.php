@@ -70,10 +70,9 @@ class StripePaymentConfigController extends BaseAdminController
                 ->set("success", true)
             ;
 
-            // Migration Thelia 3 : ce controleur redirige toujours vers l'ecran de configuration
-            // (module.configuration, rendu en Twig par StripePaymentHook::renderConfigurationScreen()).
-            // Le flag ci-dessus, stocke sur le ParserContext en memoire, ne survit pas a la redirection ;
-            // le message de succes doit donc transiter par la session (flash), lue par le hook.
+            // This controller always redirects back to the configuration screen, and the flag set
+            // above lives on the in-memory ParserContext, which does not survive a redirect. The
+            // success message therefore travels through the session flash bag, read by the hook.
             $this->getSession()->getFlashBag()->add('stripepayment_success', true);
         }
 
