@@ -12,7 +12,8 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Thelia\Core\Event\Image\ImageEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Symfony\Component\HttpFoundation\Response;
-use Thelia\Core\Template\ParserInterface;
+use Thelia\Core\Template\Parser\ParserResolver;
+use Thelia\Core\Template\TemplateHelperInterface;
 use Thelia\Core\Translation\Translator;
 use Thelia\Log\Tlog;
 use Thelia\Model\ConfigQuery;
@@ -442,16 +443,21 @@ class StripePayment extends AbstractPaymentModule
 
         $order->setTransactionRef($session->payment_intent)->save();
 
-        /** @var ParserInterface $parser */
-        $parser = $this->getContainer()->get("thelia.parser");
+        // "thelia.parser" is the ParserFallback, whose every method throws: the engine is picked
+        // per template, the same way AbstractPaymentModule::generateGatewayFormResponse() does it.
+        /** @var ParserResolver $parserResolver */
+        $parserResolver = $this->getContainer()->get('thelia.parser.resolver');
 
-        $parser->setTemplateDefinition(
-            $parser->getTemplateHelper()->getActiveFrontTemplate(),
-            true
-        );
+        /** @var TemplateHelperInterface $templateHelper */
+        $templateHelper = $this->getContainer()->get('thelia.template_helper');
+
+        $frontTemplate = $templateHelper->getActiveFrontTemplate();
+
+        $parser = $parserResolver->getParser($frontTemplate->getAbsolutePath(), null);
+        $parser->setTemplateDefinition($frontTemplate, true);
 
         $renderedTemplate = $parser->render(
-            "stripe-paiement.html",
+            'StripePayment/checkout-redirect.html.twig',
             [
                 'checkout_session_id' => $session->id,
                 'public_key' => StripePayment::getConfigValue('publishable_key')

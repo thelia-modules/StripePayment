@@ -1,0 +1,33 @@
+{# Whole HTTP response returned by StripePayment::createStripeSession(): the customer lands here
+   for the split second Stripe.js needs to hand them over to the Stripe-hosted Checkout page.
+
+   It deliberately extends nothing. A module template must not depend on the active theme's
+   markup, and this page is served outside any theme layout - the checkout tunnel has already
+   been left behind at this point.
+
+   No inline script: the redirect logic ships as a module asset and reads its parameters from the
+   data attributes below, so the page also works under a strict Content-Security-Policy. #}
+<!DOCTYPE html>
+<html lang="{{ lang_code|default('en') }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{ 'Redirecting you to the secure payment page…'|stripepayment_trans }}</title>
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <div data-stripe-checkout-redirect
+         data-stripe-public-key="{{ public_key }}"
+         data-stripe-session-id="{{ checkout_session_id }}">
+        <p>{{ 'Redirecting you to the secure payment page…'|stripepayment_trans }}</p>
+
+        {# Filled in by the script when Stripe refuses the redirect (browser or network error).
+           The Smarty template swallowed that error, leaving the customer on a page that never
+           moved and no way to know why. #}
+        <p data-stripe-checkout-redirect-error role="alert" hidden></p>
+    </div>
+
+    <script src="{{ module_asset('StripePayment', 'StripePayment/assets/js/checkout-redirect.js') }}"></script>
+</body>
+</html>
