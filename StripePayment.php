@@ -622,6 +622,9 @@ class StripePayment extends AbstractPaymentModule
                 __DIR__.'/I18n',
                 __DIR__.'/Config',
                 __DIR__.'/Tests',
+                // Form/Base holds the generated parent of Form/StripePaymentConfigForm. Both return
+                // the same getName(), so registering both would make the form name ambiguous.
+                __DIR__.'/Form/Base',
                 __FILE__,
             ])
             ->autowire(true)
