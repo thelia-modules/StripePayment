@@ -1,0 +1,32 @@
+{# Card payment fields of the Stripe Elements checkout, rendered on the
+   order-invoice.payment-extra hook. Stripe.js fills #payment-request-button and #card-element in.
+
+   Every value the integration script needs travels as a data attribute rather than as
+   interpolated JavaScript: the script is a static, cacheable module asset (see
+   stripe-elements-script.html.twig), not an inline block. #}
+<div class="stripe-payment"
+     data-stripe-elements
+     data-stripe-public-key="{{ public_key }}"
+     data-stripe-module-id="{{ stripe_module_id }}"
+     data-stripe-client-secret="{{ client_secret }}"
+     data-stripe-currency="{{ currency }}"
+     data-stripe-country="{{ country }}"
+     data-stripe-store-name="{{ store_name }}"
+     data-stripe-total-amount="{{ total_amount }}">
+    {% if one_click_payment %}
+        <div class="payment">
+            <span class="payment-label">{{ 'Quick pay'|stripepayment_trans }}</span>
+            <div id="payment-request-button"></div>
+            <div class="hidden" id="payment-request-errors" role="alert"></div>
+        </div>
+    {% endif %}
+
+    <div class="payment">
+        {% if one_click_payment %}
+            <span class="payment-label">{{ 'Or enter card details'|stripepayment_trans }}</span>
+        {% endif %}
+        <div id="card-element"></div>
+    </div>
+
+    <div class="hidden" id="card-errors" role="alert"></div>
+</div>

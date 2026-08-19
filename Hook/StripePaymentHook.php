@@ -8,7 +8,9 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
 use Thelia\Core\Template\Parser\ParserResolver;
+use Thelia\Domain\Cart\CartFacade;
 use Thelia\Domain\Taxation\TaxEngine\TaxEngine;
+use Thelia\Model\ConfigQuery;
 use Thelia\Tools\URL;
 
 /**
@@ -23,6 +25,7 @@ class StripePaymentHook extends BaseHook
     public function __construct(
         private readonly RequestStack $requestStack,
         private readonly TaxEngine $taxEngine,
+        private readonly CartFacade $cartFacade,
         ?EventDispatcherInterface $dispatcher = null,
         ?ParserResolver $parserResolver = null,
     ) {
@@ -93,17 +96,34 @@ class StripePaymentHook extends BaseHook
             return;
         }
 
+        $cart = $this->cartFacade->getCartFromSession();
+
+        if (null === $cart) {
+            return;
+        }
+
         $session = $request->getSession();
+        $country = $this->taxEngine->getDeliveryCountry();
+
+        // Amount the Payment Request button (Apple Pay / Google Pay) announces to the customer, in
+        // cents. Computed here rather than in the template: the Smarty version read it from the
+        // theme's {cart}/{order} tags, which are engine and theme specific, and it has to match, to
+        // the cent, the payment intent CartEventListener sends to Stripe.
+        $totalAmount = (int) round(
+            ((float) $session->getOrder()->getPostage() + $cart->getTaxedAmount($country)) * 100
+        );
 
         $event->add($this->render(
-            'assets/js/stripe-js.html',
+            'StripePayment/stripe-elements.html.twig',
             [
                 'stripe_module_id' => $this->getModule()->getModuleId(),
                 'public_key' => StripePayment::getConfigValue('publishable_key'),
-                'oneClickPayment' => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
-                'clientSecret' => $session->get(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY),
+                'one_click_payment' => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
+                'client_secret' => $session->get(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY),
                 'currency' => strtolower($session->getCurrency()->getCode()),
-                'country' => $this->taxEngine->getDeliveryCountry()->getIsoalpha2(),
+                'country' => $country->getIsoalpha2(),
+                'store_name' => (string) (ConfigQuery::read('store_name') ?? ''),
+                'total_amount' => $totalAmount,
             ]
         ));
     }
@@ -114,13 +134,7 @@ class StripePaymentHook extends BaseHook
             return;
         }
 
-        $event->add($this->render(
-            'assets/js/order-invoice-after-js-include.html',
-            [
-                'stripe_module_id' => $this->getModule()->getModuleId(),
-                'public_key' => StripePayment::getConfigValue('publishable_key'),
-            ]
-        ));
+        $event->add($this->render('StripePayment/stripe-elements-script.html.twig'));
     }
 
     public function includeStripeJsV3(HookRenderEvent $event): void
@@ -130,6 +144,6 @@ class StripePaymentHook extends BaseHook
 
     public function onMainHeadBottom(HookRenderEvent $event): void
     {
-        $event->add($this->addCSS('assets/css/styles.css'));
+        $event->add($this->addCSS('StripePayment/assets/css/styles.css'));
     }
 }

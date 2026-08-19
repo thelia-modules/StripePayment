@@ -1,0 +1,11 @@
+{# Loads the Stripe Elements integration, rendered on the order-invoice.after-javascript-include
+   hook - after the theme's own scripts, as the Smarty template it replaces was.
+
+   The 166 lines of inline JavaScript that template carried now live in
+   assets/js/stripe-elements.js and are published by module_asset(): a real file is cacheable,
+   debuggable, and does not need a CSP exception. It reads its parameters from the data attributes
+   of the .stripe-payment container rendered by stripe-elements.html.twig.
+
+   "defer" also settles an ordering hazard the inline version had: it guarantees Stripe.js v3,
+   loaded by the main.after-javascript-include hook, has executed before this script runs. #}
+<script src="{{ module_asset('StripePayment', 'StripePayment/assets/js/stripe-elements.js') }}" defer></script>
