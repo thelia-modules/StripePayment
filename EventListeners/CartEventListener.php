@@ -65,11 +65,16 @@ class CartEventListener implements EventSubscriberInterface
 
     public function createOrUpdatePaymentIntent(ActionEvent $event)
     {
+        $session = $this->getSession();
+
+        // Cart events also fire outside of an HTTP request (CLI import, fixtures): there is no
+        // session to hold the payment intent then, and nothing to send to Stripe.
+        if (null === $session) {
+            return;
+        }
+
         $secretKey = StripePayment::getConfigValue('secret_key');
         Stripe::setApiKey($secretKey);
-
-        /** @var Session $session */
-        $session = $this->requestStack->getCurrentRequest()->getSession();
 
         $paymentIntentValues = $this->getPaymentIntentValues($event);
 
@@ -108,8 +113,12 @@ class CartEventListener implements EventSubscriberInterface
 
     protected function getPaymentIntentValues(ActionEvent $event)
     {
-        /** @var Session $session */
-        $session = $this->requestStack->getCurrentRequest()->getSession();
+        $session = $this->getSession();
+
+        if (null === $session) {
+            return false;
+        }
+
         $currency = $session->getCurrency();
 
         $data  = $this->getCartAndOrderFromEvent($event);
@@ -171,8 +180,11 @@ class CartEventListener implements EventSubscriberInterface
 
     protected function getCartAndOrderFromEvent(ActionEvent $event)
     {
-        /** @var Session $session */
-        $session = $this->requestStack->getCurrentRequest()->getSession();
+        $session = $this->getSession();
+
+        if (null === $session) {
+            return false;
+        }
 
         if ($event instanceof CartRestoreEvent) {
             return [
@@ -210,5 +222,22 @@ class CartEventListener implements EventSubscriberInterface
         }
 
         return false;
+    }
+
+    /**
+     * No native return type: the session class is the one Thelia installs on the request,
+     * and pinning it here would turn a foreign session into a TypeError instead of a no-op.
+     *
+     * @return Session|null
+     */
+    private function getSession()
+    {
+        $request = $this->requestStack->getCurrentRequest();
+
+        if (null === $request || !$request->hasSession()) {
+            return null;
+        }
+
+        return $request->getSession();
     }
 }
