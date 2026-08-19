@@ -1,0 +1,6 @@
+{# Stripe.js v3, served on the theme's layout.body.bottom hook.
+
+   Loaded on every page on purpose, as the Smarty main.after-javascript-include hook did: Stripe
+   documents it as a requirement of their fraud detection, which needs to observe the whole
+   browsing session, not only the payment page. #}
+<script src="https://js.stripe.com/v3/"></script>

@@ -32,6 +32,17 @@ class StripePaymentHook extends BaseHook
         parent::__construct($dispatcher, $parserResolver);
     }
 
+    /**
+     * Smarty-era front-office hook points. A Twig theme declares its own with theme_hook() instead,
+     * so layout.head.bottom and layout.body.bottom are served by
+     * StripePayment\Hook\Theme\StripePaymentThemeHook. The two families never coexist in one
+     * theme - a theme reproducing the T2 names does not also use Flexy's - so the CSS and Stripe.js
+     * are never included twice.
+     *
+     * order-invoice.payment-extra and order-invoice.after-javascript-include stay here: Flexy's
+     * payment step is a LiveComponent with no per-module insertion point, so they have no Twig
+     * equivalent to move to.
+     */
     public static function getSubscribedHooks(): array
     {
         return [

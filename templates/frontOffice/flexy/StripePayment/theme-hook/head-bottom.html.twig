@@ -1,0 +1,5 @@
+{# Styles of the Stripe Elements card fields, served on the theme's layout.head.bottom hook.
+
+   module_asset() publishes the file under public/assets and returns its URL: a module cannot
+   register itself in the theme's AssetMapper importmap, which the theme owns. #}
+<link rel="stylesheet" href="{{ module_asset('StripePayment', 'StripePayment/assets/css/styles.css') }}">
