@@ -1,13 +1,10 @@
-{# Fragment rendu par le hook `module.configuration` (StripePaymentHook::renderConfigurationScreen).
-   Pas de `extends` : ce gabarit est injecte dans le contenu de la page cœur
-   `module/configure.html.twig`, qui fournit deja le titre, le fil d'Ariane et le conteneur.
+{# Fragment rendered by the `module.configuration` hook (StripePaymentHook::onModuleConfiguration).
+   No `extends`: this template is injected into the content of the core page
+   `module/configure.html.twig`, which already provides the title, breadcrumb and container.
 
-   Le FormView est recupere directement ici via la fonction Twig `getForm()` (module TwigEngine) :
-   le service `stripepayment.hook` est declare dans Config/config.xml avec une liste d'arguments
-   figee et sans autowiring (hors perimetre de cette migration), donc `TheliaFormFactory` et
-   `ParserContext` ne sont pas injectables dans le Hook. `getForm()` s'execute dans l'environnement
-   Twig (pleinement autowire) et reproduit exactement le comportement du tag Smarty {form} :
-   formulaire vierge, ou formulaire rejoue depuis la session s'il y a eu une erreur de validation. #}
+   The FormView is obtained here through the `getForm()` Twig function (TwigEngine module), which
+   reproduces what the Smarty {form} tag does in the Smarty back-office counterpart of this screen:
+   a blank form, or the form replayed from the session when validation failed. #}
 <div class="card" data-testid="stripepayment-configuration">
     <div class="card-body">
         <h2 class="h5 mb-3">{{ 'Configure stripepayment'|trans({}, 'stripepayment.bo.default') }}</h2>
@@ -26,12 +23,11 @@
 
         {{ form_start(form, { action: save_url, method: 'post', attr: { 'data-testid': 'stripepayment-config-form' } }) }}
 
-            {# Migration Thelia 3 : StripePaymentConfigForm (Form/Base/**, hors perimetre) definit ces
-               3 champs avec l'option "value" (utilisee par le plugin Smarty {form_field} d'origine
-               pour l'etat coche) et non "data" (utilisee par le rendu Symfony/Twig standard). Sans
-               correction, `form_widget()` afficherait toujours les cases decochees quelle que soit la
-               configuration enregistree. On force donc l'etat "checked" depuis `vars.value`, qui
-               contient bien la valeur stockee ("1"/"0"). #}
+            {# StripePaymentConfigForm declares these 3 checkboxes with the "value" option (read by
+               the original Smarty {form_field} plugin) instead of "data" (read by the standard
+               Symfony/Twig rendering). Without forcing it, form_widget() would always render them
+               unchecked whatever the saved configuration, so the checked state is taken from
+               `vars.value`, which does hold the stored "1"/"0". #}
             <div class="form-check mb-3">
                 {{ form_widget(form.enabled, { checked: form.enabled.vars.value }) }}
                 <label class="form-check-label" for="{{ form.enabled.vars.id }}">{{ form.enabled.vars.label }}</label>

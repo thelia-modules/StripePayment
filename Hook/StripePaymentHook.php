@@ -18,122 +18,118 @@ use Thelia\Tools\URL;
  */
 class StripePaymentHook extends BaseHook
 {
-
-    protected $taxEngine;
-
-    // Migration Thelia 3 : BaseHook::__construct prend (?EventDispatcherInterface,
-    // ?ParserResolver). La requete est resolue a l'appel, elle n'existe pas
-    // forcement a la construction du service.
-    //
-    // Note : Config/config.xml declare ce service avec une liste d'<argument> figee
-    // (request_stack, thelia.taxEngine), sans autowiring. Modifier cette liste est hors
-    // perimetre (Config/** n'est pas dans les chemins autorises) : `$this->container` reste
-    // aussi non initialise pour ce service (l'injection de la propriete #[Required] ne se
-    // declenche que sur les services autowire). On n'ajoute donc aucune dependance
-    // supplementaire au constructeur ; l'ecran de configuration s'appuie sur les acces
-    // globaux deja utilises par ce module (URL::getInstance(), $this->translator) et sur la
-    // fonction Twig `getForm()` (module TwigEngine, deja utilisee cote front) pour obtenir le
-    // FormView, exactement comme le faisait le tag Smarty {form}.
+    // The request is resolved on each call rather than captured in the constructor:
+    // the service is built once and would otherwise hold a stale request in worker mode.
     public function __construct(
         private readonly RequestStack $requestStack,
-        TaxEngine $taxEngine,
+        private readonly TaxEngine $taxEngine,
         ?EventDispatcherInterface $dispatcher = null,
         ?ParserResolver $parserResolver = null,
     ) {
-        $this->taxEngine = $taxEngine;
         parent::__construct($dispatcher, $parserResolver);
     }
 
-    /**
-     * Migration Thelia 3 : le hook `module.configuration` reste declare dans Config/config.xml
-     * (hors perimetre de cette migration) avec l'attribut historique
-     * `templates="render:stripepayment-configuration.html"`. Cette declaration est persistee
-     * telle quelle dans la table `module_hook` (colonne `templates`) et toujours invoquee via
-     * la methode heritee `insertTemplate()`. Or `BaseHook::render()` choisit le parser par
-     * extension litterale du nom de fichier : avec un nom fige a ".html" dans cette table, seul
-     * Smarty peut jamais matcher, meme si un fichier ".html.twig" existe a cote. On surcharge
-     * donc `insertTemplate()` pour prendre la main sur ce seul hook (identifie par son code
-     * d'evenement, qui contient toujours "module.configuration") et rendre nous-memes l'ecran
-     * Twig, avec le FormView en parametre. Les autres hooks de cette classe utilisent deja un
-     * attribut "method" explicite dans le XML et ne passent jamais par ici.
-     */
-    public function insertTemplate(HookRenderEvent $event, string $code): void
+    public static function getSubscribedHooks(): array
     {
-        if (!str_contains($code, 'module.configuration')) {
-            parent::insertTemplate($event, $code);
+        return [
+            'order-invoice.payment-extra' => [
+                ['type' => 'front', 'method' => 'includeStripe'],
+            ],
+            'order-invoice.after-javascript-include' => [
+                ['type' => 'front', 'method' => 'declareStripeOnClickEvent'],
+            ],
+            'main.after-javascript-include' => [
+                ['type' => 'front', 'method' => 'includeStripeJsV3'],
+            ],
+            'main.head-bottom' => [
+                ['type' => 'front', 'method' => 'onMainHeadBottom'],
+            ],
+            'module.configuration' => [
+                ['type' => 'back', 'method' => 'onModuleConfiguration'],
+            ],
+        ];
+    }
 
+    /**
+     * Renders the back-office configuration screen with the template of the current parser:
+     * stripepayment-configuration.html for the Smarty back-office, its .html.twig counterpart
+     * for the Twig one. Both templates build the form themselves ({form} tag / getForm()).
+     */
+    public function onModuleConfiguration(HookRenderEvent $event): void
+    {
+        $secureUrl = (string) (StripePayment::getConfigValue(StripePayment::SECURE_URL) ?? '');
+        $request = $this->requestStack->getCurrentRequest();
+        $successMessage = null;
+
+        // The controller redirects back to this screen, so the success flag travels through
+        // the session flash bag: the in-memory ParserContext does not survive the redirect.
+        if (null !== $request && $request->hasSession()
+            && [] !== $request->getSession()->getFlashBag()->get('stripepayment_success')) {
+            $successMessage = $this->trans('Configuration correctly saved', [], StripePayment::MESSAGE_DOMAIN);
+        }
+
+        $event->add($this->render(
+            'stripepayment-configuration.'.$this->getParser()->getFileExtension(),
+            [
+                'success_message' => $successMessage,
+                'save_url' => URL::getInstance()->absoluteUrl('/admin/module/StripePayment'),
+                'close_url' => URL::getInstance()->absoluteUrl('/admin/modules'),
+                'webhook_url' => '' !== $secureUrl
+                    ? URL::getInstance()->absoluteUrl('/module/StripePayment/stripe_webhook/'.$secureUrl.'/listen')
+                    : null,
+            ]
+        ));
+    }
+
+    public function includeStripe(HookRenderEvent $event): void
+    {
+        if (!StripePayment::getConfigValue('stripe_element')) {
             return;
         }
 
-        $event->add($this->renderConfigurationScreen());
-    }
-
-    private function renderConfigurationScreen(): string
-    {
-        $successMessage = null;
         $request = $this->requestStack->getCurrentRequest();
 
-        if (null !== $request && $request->hasSession()) {
-            if ([] !== $request->getSession()->getFlashBag()->get('stripepayment_success')) {
-                $successMessage = $this->trans('Configuration correctly saved', [], StripePayment::MESSAGE_DOMAIN);
-            }
+        if (null === $request || !$request->hasSession()) {
+            return;
         }
 
-        $secureUrl = (string) (StripePayment::getConfigValue(StripePayment::SECURE_URL) ?? '');
+        $session = $request->getSession();
 
-        return $this->render('stripe-payment/configuration.html.twig', [
-            'success_message' => $successMessage,
-            'save_url' => URL::getInstance()->absoluteUrl('/admin/module/StripePayment'),
-            'close_url' => URL::getInstance()->absoluteUrl('/admin/modules'),
-            'webhook_url' => '' !== $secureUrl
-                ? URL::getInstance()->absoluteUrl('/module/StripePayment/stripe_webhook/'.$secureUrl.'/listen')
-                : null,
-        ]);
+        $event->add($this->render(
+            'assets/js/stripe-js.html',
+            [
+                'stripe_module_id' => $this->getModule()->getModuleId(),
+                'public_key' => StripePayment::getConfigValue('publishable_key'),
+                'oneClickPayment' => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
+                'clientSecret' => $session->get(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY),
+                'currency' => strtolower($session->getCurrency()->getCode()),
+                'country' => $this->taxEngine->getDeliveryCountry()->getIsoalpha2(),
+            ]
+        ));
     }
 
-    public function includeStripe(HookRenderEvent $event)
+    public function declareStripeOnClickEvent(HookRenderEvent $event): void
     {
-		if(StripePayment::getConfigValue('stripe_element')){
-			$publicKey = StripePayment::getConfigValue('publishable_key');
-			$clientSecret = $this->requestStack->getCurrentRequest()->getSession()->get(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY);
-			$currency = strtolower($this->requestStack->getCurrentRequest()->getSession()->getCurrency()->getCode());
-            $country = $this->taxEngine->getDeliveryCountry()->getIsoalpha2();
-            $event->add($this->render(
-				'assets/js/stripe-js.html',
-				[
-					'stripe_module_id' => $this->getModule()->getModuleId(),
-					'public_key' => $publicKey,
-                    'oneClickPayment' => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
-                    'clientSecret' => $clientSecret,
-                    'currency' => $currency,
-                    'country' => $country
-				]
-			));
-		}
+        if (!StripePayment::getConfigValue('stripe_element')) {
+            return;
+        }
+
+        $event->add($this->render(
+            'assets/js/order-invoice-after-js-include.html',
+            [
+                'stripe_module_id' => $this->getModule()->getModuleId(),
+                'public_key' => StripePayment::getConfigValue('publishable_key'),
+            ]
+        ));
     }
 
-    public function declareStripeOnClickEvent(HookRenderEvent $event)
-    {
-		if(StripePayment::getConfigValue('stripe_element')){
-			$publicKey = StripePayment::getConfigValue('publishable_key');
-			$event->add($this->render(
-				'assets/js/order-invoice-after-js-include.html',
-				[
-					'stripe_module_id' => $this->getModule()->getModuleId(),
-					'public_key' => $publicKey
-				]
-			));
-		}
-    }
-
-    public function includeStripeJsV3(HookRenderEvent $event)
+    public function includeStripeJsV3(HookRenderEvent $event): void
     {
         $event->add('<script src="https://js.stripe.com/v3/"></script>');
     }
 
-	public function onMainHeadBottom(HookRenderEvent $event)
+    public function onMainHeadBottom(HookRenderEvent $event): void
     {
-        $content = $this->addCSS('assets/css/styles.css');
-        $event->add($content);
+        $event->add($this->addCSS('assets/css/styles.css'));
     }
 }
