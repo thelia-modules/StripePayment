@@ -39,6 +39,13 @@ use Thelia\Tools\URL;
 class StripePayment extends AbstractPaymentModule
 {
     const MESSAGE_DOMAIN = "stripepayment";
+
+    /**
+     * Front-office translation domain. Thelia derives it from the name of the template directory
+     * (`templates/frontOffice/flexy`) and reads the catalogues from the mirrored
+     * `I18n/frontOffice/flexy`, so renaming either one renames the domain.
+     */
+    const FRONT_TRANSLATION_DOMAIN = "stripepayment.fo.flexy";
     const CONFIRMATION_MESSAGE_NAME = "stripe_confirm_payment";
 
     const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
