@@ -41,6 +41,9 @@ class StripePayment extends AbstractPaymentModule
     const MESSAGE_DOMAIN = "stripepayment";
     const CONFIRMATION_MESSAGE_NAME = "stripe_confirm_payment";
 
+    const ORDER_ID_METADATA_KEY = 'order_id';
+    const ORDER_REF_METADATA_KEY = 'order_ref';
+
     const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
     const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
     const PAYMENT_INTENT_SECRET_SESSION_KEY = 'payment_intent_secret';
@@ -402,11 +405,23 @@ class StripePayment extends AbstractPaymentModule
 
         $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
 
+        // Stripe copies payment_intent_data.metadata onto the PaymentIntent it creates for this session,
+        // so payment_intent.succeeded and payment_intent.payment_failed both carry the order reference.
+        // This is the only identifier available on a declined payment, which never completes the session.
+        $orderMetadata = [
+            self::ORDER_ID_METADATA_KEY => (string) $order->getId(),
+            self::ORDER_REF_METADATA_KEY => $order->getRef(),
+        ];
+
         $payload = [
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
             'line_items' => $lineItems,
             'mode' => 'payment',
+            'metadata' => $orderMetadata,
+            'payment_intent_data' => [
+                'metadata' => $orderMetadata,
+            ],
             'success_url' => URL::getInstance()->absoluteUrl('/order/placed/' . $order->getId()),
             'cancel_url' => URL::getInstance()->absoluteUrl('/order/failed/' . $order->getId() . '/error'),
         ];
@@ -424,7 +439,21 @@ class StripePayment extends AbstractPaymentModule
 
         $session = $stripe->checkout->sessions->create($payload);
 
-        $order->setTransactionRef($session->payment_intent)->save();
+        // A freshly created Checkout Session has no PaymentIntent yet: Stripe only creates it when the
+        // customer engages the payment. Falling back on the session id keeps transaction_ref filled;
+        // the webhook handlers promote it to the PaymentIntent id as soon as that one exists.
+        if (null === $session->payment_intent) {
+            (new StripePaymentLog())->logText(
+                sprintf(
+                    'Checkout session %s created without a PaymentIntent for order %d. Storing the session id as transaction reference.',
+                    $session->id,
+                    $order->getId()
+                ),
+                StripePaymentLog::WARNING
+            );
+        }
+
+        $order->setTransactionRef($session->payment_intent ?: $session->id)->save();
 
         /** @var ParserInterface $parser */
         $parser = $this->getContainer()->get("thelia.parser");
