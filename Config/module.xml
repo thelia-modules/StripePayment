@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module xmlns="http://thelia.net/schema/dic/module"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://thelia.net/schema/dic/module http://thelia.net/schema/dic/module/module-2_1.xsd">
+        xsi:schemaLocation="http://thelia.net/schema/dic/module http://thelia.net/schema/dic/module/module-2_2.xsd">
     <fullnamespace>StripePayment\StripePayment</fullnamespace>
     <descriptive locale="en_US">
         <title>Stripe</title>
@@ -14,11 +14,14 @@
         <language>fr_FR</language>
     </languages>
     <version>5.0.0</version>
-    <author>
-        <name>Etienne Perriere</name>
-        <email>eperriere@openstudio.fr</email>
-    </author>
+    <authors>
+        <author>
+            <name>Etienne Perriere</name>
+            <email>eperriere@openstudio.fr</email>
+        </author>
+    </authors>
     <type>payment</type>
     <thelia>3.0.0</thelia>
     <stability>other</stability>
+    <enabled-by-default>0</enabled-by-default>
 </module>
