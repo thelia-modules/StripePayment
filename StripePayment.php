@@ -326,9 +326,11 @@ class StripePayment extends AbstractPaymentModule
         if ($logMessage !== NULL) {
             (new StripePaymentLog())->logText($logMessage, StripePaymentLog::ERROR);
 
+            // Flexy's failure page cancels the order and shows the message; the Thelia 2
+            // /order/failed/{id}/{message} route no longer exists.
             return new RedirectResponse(
-                URL::getInstance()->absoluteUrl("/order/failed/".$order->getId()."/".$userMessage)
-                );
+                URL::getInstance()->absoluteUrl('/checkout/failed', ['order_id' => $order->getId(), 'message' => $userMessage])
+            );
         }
 
         return new Response();
@@ -424,8 +426,9 @@ class StripePayment extends AbstractPaymentModule
             'client_reference_id' => $order->getRef(),
             'line_items' => $lineItems,
             'mode' => 'payment',
-            'success_url' => URL::getInstance()->absoluteUrl('/order/placed/' . $order->getId()),
-            'cancel_url' => URL::getInstance()->absoluteUrl('/order/failed/' . $order->getId() . '/error'),
+            // Flexy's checkout routes: the Thelia 2 /order/placed and /order/failed pages are gone.
+            'success_url' => URL::getInstance()->absoluteUrl('/checkout/confirm'),
+            'cancel_url' => URL::getInstance()->absoluteUrl('/checkout/failed', ['order_id' => $order->getId()]),
         ];
 
         $payload = $this->applyPaymentMethodSelection($payload);
