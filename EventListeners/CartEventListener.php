@@ -73,7 +73,18 @@ class CartEventListener implements EventSubscriberInterface
             return;
         }
 
-        $secretKey = StripePayment::getConfigValue('secret_key');
+        // Payment intents only feed the Stripe Elements card form. Without a secret key the Stripe
+        // calls below throw (a 500 on every cart change of a logged-in customer), and in the
+        // Checkout redirect mode the intent is never used: create nothing in either case.
+        $secretKey = (string) (StripePayment::getConfigValue(StripePayment::SECRET_KEY) ?? '');
+
+        if ('' === $secretKey
+            || !StripePayment::getConfigValue(StripePayment::ENABLED)
+            || !StripePayment::getConfigValue(StripePayment::STRIPE_ELEMENT)
+        ) {
+            return;
+        }
+
         Stripe::setApiKey($secretKey);
 
         $paymentIntentValues = $this->getPaymentIntentValues($event);

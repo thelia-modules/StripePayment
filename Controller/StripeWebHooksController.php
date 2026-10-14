@@ -29,7 +29,13 @@ class StripeWebHooksController extends BaseFrontController
                 Stripe::setApiKey(StripePayment::getConfigValue('secret_key'));
 
                 // You can find your endpoint's secret in your webhook settings
-                $endpointSecret = StripePayment::getConfigValue('webhooks_key');
+                $endpointSecret = (string) (StripePayment::getConfigValue('webhooks_key') ?? '');
+
+                // An empty signing secret is a secret anyone knows: the HMAC would be checked
+                // against an empty key and a forged "checkout.session.completed" accepted.
+                if ('' === $endpointSecret) {
+                    return new Response('Webhook signing secret not configured', 400);
+                }
 
                 $payload = $request->getContent();
                 // Lecture par l'objet Request plutot que par $_SERVER : un appel sans

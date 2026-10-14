@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace StripePayment\Hook\Theme;
 
+use StripePayment\StripePayment;
 use Thelia\Core\Hook\Theme\ThemeHookInterface;
 use Twig\Environment;
 
@@ -40,6 +41,15 @@ final readonly class StripePaymentThemeHook implements ThemeHookInterface
 
     public function render(string $hookName, array $parameters): string
     {
+        // Until the merchant has switched the module on with a publishable key, Stripe.js has
+        // nothing to work with: no third-party script on every page of a shop that cannot pay
+        // with Stripe.
+        if (!StripePayment::getConfigValue(StripePayment::ENABLED)
+            || '' === (string) (StripePayment::getConfigValue(StripePayment::PUBLISHABLE_KEY) ?? '')
+        ) {
+            return '';
+        }
+
         return match ($hookName) {
             'layout.head.bottom' => $this->twig->render(self::HEAD_BOTTOM_TEMPLATE, $parameters),
             'layout.body.bottom' => $this->twig->render(self::BODY_BOTTOM_TEMPLATE, $parameters),
