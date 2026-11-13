@@ -15,7 +15,6 @@ return array(
     'Payment confirmation for Stripe Payment' => 'Confirmation de paiement par Stripe',
     'Payment confirmation of your order {$order_ref} on {$store_name}' => 'Confirmation de paiement pour votre commande {$order_ref} sur {$store_name}',
     'Sorry, an error occurred: %err' => 'Désolé, une erreur est survenue : %err',
-    'The card payment does not match what is left to pay on this order.' => 'Le paiement par carte ne correspond pas à ce qu\'il reste à payer sur cette commande.',
     'The amount left to pay is below what Stripe can charge.' => 'Le montant restant à payer est inférieur à ce que Stripe peut encaisser.',
     'Stripe library is missing.' => 'La libraire Stripe est manquante',
     'Stripe version is greater than max version (< %version). Current version: %curVersion.' => 'La version de la libraire Stripe est plus haute qua la version maximum ( < %version). Version actuelle %curVersion.',

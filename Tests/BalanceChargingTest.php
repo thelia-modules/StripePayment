@@ -7,18 +7,10 @@ namespace StripePayment\Tests;
 // The tests are found by their path, not by an autoload: the shared fixtures are loaded the same way.
 require_once __DIR__.'/PaymentPartsFixtures.php';
 
-use PHPUnit\Framework\Attributes\DataProvider;
 use Stripe\Exception\InvalidRequestException;
 use StripePayment\Classes\StripePaymentException;
-use StripePayment\Service\CartChargedAmount;
 use StripePayment\Service\ChargedAmount;
 use StripePayment\StripePayment;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Thelia\Domain\Payment\DTO\PaymentComposition;
-use Thelia\Domain\Payment\DTO\PlannedPaymentPart;
-use Thelia\Domain\Payment\OrderPaymentComposer;
-use Thelia\Model\Order;
-use Thelia\Model\OrderQuery;
 use Thelia\Module\BalanceChargingPaymentModuleInterface;
 use Thelia\Test\IntegrationTestCase;
 
@@ -89,78 +81,6 @@ final class BalanceChargingTest extends IntegrationTestCase
         $this->module()->checkoutSessionPayload($order);
     }
 
-    /**
-     * The card fields confirm their PaymentIntent in the browser before the order is placed: an order paid in parts
-     * is tied to that intent only when it was asked for the balance.
-     */
-    public function testTheCardFieldsPayAnOrderPaidInPartsWhenTheirIntentChargedTheBalance(): void
-    {
-        StripePayment::setConfigValue(StripePayment::STRIPE_ELEMENT, 1);
-        $order = $this->orderOf100();
-        $this->payInParts($order, '30.000000', '70.000000');
-
-        $response = $this->payWithTheCardFields($order, 7000);
-
-        self::assertNull($response);
-        self::assertSame('pi_built_from_the_cart', OrderQuery::create()->findPk($order->getId())?->getTransactionRef());
-    }
-
-    /** @return iterable<string, array{?int}> */
-    public static function amountsThatAreNotTheBalance(): iterable
-    {
-        yield 'the total of the cart' => [10000];
-        yield 'an amount nobody recorded' => [null];
-    }
-
-    #[DataProvider('amountsThatAreNotTheBalance')]
-    public function testTheCardFieldsAreRefusedWhenTheirIntentDidNotChargeTheBalance(?int $charged): void
-    {
-        StripePayment::setConfigValue(StripePayment::STRIPE_ELEMENT, 1);
-        $order = $this->orderOf100();
-        $this->payInParts($order, '30.000000', '70.000000');
-
-        $response = $this->payWithTheCardFields($order, $charged);
-
-        self::assertInstanceOf(RedirectResponse::class, $response);
-        self::assertStringContainsString('/checkout/failed', $response->getTargetUrl());
-        self::assertStringContainsString('order_id='.$order->getId(), $response->getTargetUrl());
-        self::assertStringContainsString('does+not+match', $response->getTargetUrl());
-        self::assertNull(OrderQuery::create()->findPk($order->getId())?->getTransactionRef());
-    }
-
-    public function testTheCardFieldsStillPayAnOrderWithNoPart(): void
-    {
-        StripePayment::setConfigValue(StripePayment::STRIPE_ELEMENT, 1);
-        $order = $this->orderOf100();
-
-        $response = $this->payWithTheCardFields($order, null);
-
-        self::assertNull($response);
-        self::assertSame('pi_built_from_the_cart', OrderQuery::create()->findPk($order->getId())?->getTransactionRef());
-    }
-
-    public function testTheIntentOfACartPaidInPartsHoldsTheBalanceOfItsComposition(): void
-    {
-        $composition = new PaymentComposition([
-            new PlannedPaymentPart(1, '30.000000', false, 0, true),
-            new PlannedPaymentPart(2, '70.000000', true, 1, false),
-        ], '70.000000');
-
-        self::assertSame(7000, $this->cartChargedAmount()->ofComposition($composition, 10000));
-    }
-
-    public function testTheIntentOfACartNoInstantMeansPaysHoldsTheTotalOfTheCart(): void
-    {
-        self::assertSame(10000, $this->cartChargedAmount()->ofComposition(new PaymentComposition([], '0.000000'), 10000));
-    }
-
-    public function testNothingIsLeftForTheIntentWhenTheInstantMeansCoverTheCart(): void
-    {
-        $composition = new PaymentComposition([new PlannedPaymentPart(1, '100.000000', true, 0, true)], '0.000000');
-
-        self::assertSame(0, $this->cartChargedAmount()->ofComposition($composition, 10000));
-    }
-
     public function testABalanceStripeCannotChargeIsToldToTheBuyerAsSuch(): void
     {
         $message = new \ReflectionMethod(StripePayment::class, 'invalidRequestMessage');
@@ -173,21 +93,6 @@ final class BalanceChargingTest extends IntegrationTestCase
             'Invalid parameters were supplied to Stripe.',
             $message->invoke($this->module(), InvalidRequestException::factory('No such price', 400, null, null, null, 'resource_missing')),
         );
-    }
-
-    private function payWithTheCardFields(Order $order, ?int $chargedByTheIntent): mixed
-    {
-        $module = $this->module();
-        $session = $module->getRequest()->getSession();
-        $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, 'pi_built_from_the_cart');
-        $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, $chargedByTheIntent);
-
-        return (new \ReflectionMethod(StripePayment::class, 'doPay'))->invoke($module, $order);
-    }
-
-    private function cartChargedAmount(): CartChargedAmount
-    {
-        return new CartChargedAmount(static::getContainer()->get(OrderPaymentComposer::class));
     }
 
     private function module(): StripePayment

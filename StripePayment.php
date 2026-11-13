@@ -7,6 +7,8 @@ use Propel\Runtime\Connection\ConnectionInterface;
 use StripePayment\Classes\StripePaymentException;
 use StripePayment\Classes\StripePaymentLog;
 use StripePayment\Service\ChargedAmount;
+use StripePayment\Service\OrderPaymentIntent;
+use StripePayment\Service\PaymentMethodSelection;
 use Symfony\Component\Config\Definition\Exception\Exception;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -40,8 +42,7 @@ use Thelia\Tools\URL;
  * @author Etienne Perriere - OpenStudio <eperriere@openstudio.fr>
  *
  * Charges the balance of an order paid in several parts (BalanceChargingPaymentModuleInterface): the amount sent to
- * Stripe comes from Service\ChargedAmount for an order and from Service\CartChargedAmount for a cart, never from
- * Order::getTotalAmount(), and the confirmation of a payment names the module as its source.
+ * Stripe comes from Service\ChargedAmount, never from Order::getTotalAmount(), and the confirmation of a payment names the module as its source.
  */
 class StripePayment extends AbstractPaymentModule implements BalanceChargingPaymentModuleInterface
 {
@@ -55,15 +56,15 @@ class StripePayment extends AbstractPaymentModule implements BalanceChargingPaym
     const FRONT_TRANSLATION_DOMAIN = "stripepayment.fo.flexy";
     const CONFIRMATION_MESSAGE_NAME = "stripe_confirm_payment";
 
-    const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
-    const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
-    const PAYMENT_INTENT_SECRET_SESSION_KEY = 'payment_intent_secret';
-    /** What the PaymentIntent of the session was last asked to charge, in the smallest unit of the currency. */
-    const PAYMENT_INTENT_AMOUNT_SESSION_KEY = 'payment_intent_amount';
+    /** The order the session was sent to the payment form for (Stripe Elements). */
+    const PENDING_ORDER_SESSION_KEY = 'stripe_payment.pending_order_id';
+
+    /** The page that holds the payment form, and the one Stripe sends the buyer back to. */
+    const PAYMENT_PAGE_PATH = '/module/StripePayment/payment';
+    const PAYMENT_RETURN_PATH = '/module/StripePayment/payment/return';
 
     const ENABLED = "enabled";
     const STRIPE_ELEMENT = "stripe_element";
-    const ONE_CLICK_PAYMENT = "one_click_payment";
     const SECRET_KEY = "secret_key";
     const PUBLISHABLE_KEY = "publishable_key";
     const WEBHOOKS_KEY = "webhooks_key";
@@ -204,23 +205,16 @@ class StripePayment extends AbstractPaymentModule implements BalanceChargingPaym
 
         try {
 
-            if(StripePayment::getConfigValue('stripe_element')){
-                $this->refuseCardFieldsThatDidNotChargeTheBalance($order, $session);
+            if (StripePayment::getConfigValue(self::STRIPE_ELEMENT)) {
+                // The order exists: its PaymentIntent is created for what it leaves to pay, and the buyer is sent
+                // to the page that holds the payment form. A redirection, so that reloading that page asks for
+                // the same order again instead of placing another one.
+                $this->orderPaymentIntent()->createFor($order);
 
-                $order->setTransactionRef($session->get(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY))
-                    ->save();
-                $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, null);
+                $session->set(self::PENDING_ORDER_SESSION_KEY, $order->getId());
 
-                return;
+                return new RedirectResponse(URL::getInstance()->absoluteUrl(self::PAYMENT_PAGE_PATH));
             }
-
-            $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
-            $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
-            $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
-            $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, null);
 
             // Create the session on Stripe's servers - this will charge the user's order and save session id into order transaction reference
             return $this->createStripeSession($order);
@@ -352,28 +346,7 @@ class StripePayment extends AbstractPaymentModule implements BalanceChargingPaym
      */
     private function applyPaymentMethodSelection(array $payload): array
     {
-        $override = trim((string) (StripePayment::getConfigValue(StripePayment::STRIPE_PMC_TYPES_OVERRIDE) ?? ''));
-
-        if ($override !== '') {
-            $types = array_values(array_filter(
-                array_map('trim', explode(',', $override)),
-                static fn (string $type): bool => $type !== ''
-            ));
-
-            if ($types !== []) {
-                $payload['payment_method_types'] = $types;
-
-                return $payload;
-            }
-        }
-
-        $pmcId = trim((string) (StripePayment::getConfigValue(StripePayment::CONFIG_PMC_ID) ?? ''));
-
-        if ($pmcId !== '') {
-            $payload['payment_method_configuration'] = $pmcId;
-        }
-
-        return $payload;
+        return (new PaymentMethodSelection())->applyTo($payload);
     }
 
     private static function formatStripeException(\Stripe\Exception\ApiErrorException $e): string
@@ -403,42 +376,11 @@ class StripePayment extends AbstractPaymentModule implements BalanceChargingPaym
     }
 
     /**
-     * The card fields confirm their PaymentIntent in the browser, before the order is placed: it is built from the
-     * cart and brought to the balance by CartEventListener and StripePaymentHook. An order paid in several parts is
-     * tied to that intent only when it charged what the order leaves to pay; anything else is refused, and logged
-     * with the intent so that the merchant can give back what it took.
+     * Read from the container, where a test puts the one that answers in the place of Stripe.
      */
-    private function refuseCardFieldsThatDidNotChargeTheBalance(Order $order, $session): void
+    private function orderPaymentIntent(): OrderPaymentIntent
     {
-        if (!$this->chargedAmount()->isPaidInParts($order)) {
-            return;
-        }
-
-        $charged = $session->get(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY);
-        $balance = $this->chargedAmount()->forStripe($order);
-
-        if (null !== $charged && (int) $charged === $balance) {
-            return;
-        }
-
-        (new StripePaymentLog())->logText(
-            sprintf(
-                'Order %d is paid in several parts and leaves %d to pay, but the PaymentIntent %s of the card fields was asked for %s. If it was confirmed, it has to be refunded.',
-                $order->getId(),
-                $balance,
-                (string) $session->get(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY),
-                null === $charged ? 'an unknown amount' : (string) $charged
-            ),
-            StripePaymentLog::ERROR
-        );
-
-        throw new StripePaymentException(Translator::getInstance()
-            ->trans(
-                'The card payment does not match what is left to pay on this order.',
-                [],
-                StripePayment::MESSAGE_DOMAIN
-            )
-        );
+        return $this->getContainer()->get(OrderPaymentIntent::class);
     }
 
     /**
@@ -742,5 +684,11 @@ class StripePayment extends AbstractPaymentModule implements BalanceChargingPaym
             ])
             ->autowire(true)
             ->autoconfigure(true);
+
+        // pay() is called on an instance of the module the core builds itself, with the container for only way to a
+        // service: this one has to be readable from it.
+        $servicesConfigurator->set(OrderPaymentIntent::class)
+            ->autowire(true)
+            ->public();
     }
 }

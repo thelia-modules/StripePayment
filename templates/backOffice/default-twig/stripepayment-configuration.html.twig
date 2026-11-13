@@ -46,12 +46,6 @@
                 {{ form_errors(form.stripe_element) }}
             </div>
 
-            <div class="form-check mb-3">
-                {{ form_widget(form.one_click_payment, { checked: form.one_click_payment.vars.value }) }}
-                <label class="form-check-label" for="{{ form.one_click_payment.vars.id }}">{{ form.one_click_payment.vars.label }}</label>
-                {{ form_errors(form.one_click_payment) }}
-            </div>
-
             {% for fieldName in ['secret_key', 'publishable_key', 'webhooks_key', 'secure_url', 'payment_method_types_override', 'payment_method_configuration_id'] %}
                 {% set field = form[fieldName] %}
                 <div class="mb-3">
