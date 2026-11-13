@@ -65,14 +65,13 @@ class StripePaymentConfigController extends BaseAdminController
                 ->setGeneralError($errorMessage)
             ;
         } else {
-            $context
-                ->set("success", true)
-            ;
-
-            // This controller always redirects back to the configuration screen, and the flag set
-            // above lives on the in-memory ParserContext, which does not survive a redirect. The
-            // success message therefore travels through the session flash bag, read by the hook.
-            $this->getSession()->getFlashBag()->add('stripepayment_success', true);
+            // This controller always redirects back to the configuration screen, so the message
+            // travels through the session flash bag. The back-office layout renders every flash
+            // with its type as the alert class: "success" gives the standard confirmation.
+            $this->getSession()->getFlashBag()->add(
+                'success',
+                Translator::getInstance()->trans('Configuration correctly saved', [], StripePayment::MESSAGE_DOMAIN)
+            );
         }
 
         return $this->generateRedirect(URL::getInstance()->absoluteUrl('/admin/module/StripePayment'));

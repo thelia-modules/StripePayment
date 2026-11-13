@@ -5,6 +5,7 @@ return array(
     'An error occurred during payment.' => 'An error occurred during payment.',
     'An error occurred with Stripe.' => 'An error occurred with Stripe.',
     'Authentication with Stripe failed. Please contact administrators.' => 'Authentication with Stripe failed. Please contact administrators.',
+    'Configuration correctly saved' => 'Configuration correctly saved',
     'Nothing left to pay on this order.' => 'Nothing left to pay on this order.',
     'The amount left to pay is below what Stripe can charge.' => 'The amount left to pay is below what Stripe can charge.',
     'Do you want to activate Stripe Payment' => 'Do you want to activate Stripe Payment',

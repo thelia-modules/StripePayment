@@ -9,10 +9,6 @@
     <div class="card-body">
         <h2 class="h5 mb-3">{{ 'Configure stripepayment'|trans({}, 'stripepayment.bo.default') }}</h2>
 
-        {% if success_message %}
-            <div class="alert alert-success" data-testid="stripepayment-success">{{ success_message }}</div>
-        {% endif %}
-
         {% set form = getForm('stripepayment_config_form') %}
 
         {% form_theme form with bo_form_themes only %}

@@ -6,6 +6,7 @@ return array(
     'An error occurred during payment.' => 'Une erreur est survenue lors du paiement.',
     'An error occurred with Stripe.' => 'Une erreur est survenue lors du paiement avec Stripe.',
     'Authentication with Stripe failed. Please contact administrators.' => 'L\'authentification auprès de Stripe a échoué. Merci de contacter les administrateurs du site.',
+    'Configuration correctly saved' => 'Configuration enregistrée',
     'Discount' => 'Remise',
     'Do you want to activate Stripe Payment' => 'Voulez-vous activer Stripe ?',
     'Element is the embedded and customizable payment form' => 'Element est un formulaire intégrer et personlisable.',
