@@ -19,9 +19,9 @@ use Twig\Environment;
  *   main.head-bottom              -> layout.head.bottom
  *   main.after-javascript-include -> layout.body.bottom
  *
- * order-invoice.payment-extra, which injects the Stripe Elements card fields into the payment
- * form, has NO equivalent: Flexy's payment step is a LiveComponent with no per-module insertion
- * point. It stays on the legacy hook, handled by StripePayment\Hook\StripePaymentHook.
+ * order-invoice.payment-extra, which injected the Stripe Elements card fields into the payment
+ * form, is not carried over: the payment form is shown once the order is placed, on a page of
+ * its own (StripePayment\Controller\StripePaymentController).
  */
 final readonly class StripePaymentThemeHook implements ThemeHookInterface
 {

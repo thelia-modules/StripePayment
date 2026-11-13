@@ -7,6 +7,7 @@ use Stripe\Exception\SignatureVerificationException;
 use Stripe\Stripe;
 use Stripe\Webhook;
 use StripePayment\Classes\StripePaymentLog;
+use StripePayment\Service\OrderConfirmation;
 use StripePayment\StripePayment;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -67,19 +68,22 @@ class StripeWebHooksController extends BaseFrontController
                         $sessionCompleted = $event->data->object;
                         $this->handleSessionCompleted($sessionCompleted, $dispatcher);
                         break;
+                    // No waiting here: the order exists before its PaymentIntent, in both modes.
                     case 'payment_intent.succeeded':
-                        // Needed to wait for order to be created (Stripe is faster than Thelia)
-                        sleep(5);
-                        /** @var Session $sessionCompleted */
-                        $paymentId = $event->data->object->id;
-                        $this->handlePaymentIntentSuccess($paymentId, $dispatcher);
+                        $this->handlePaymentIntentSuccess($event->data->object->id, $dispatcher);
                         break;
                     case 'payment_intent.payment_failed':
-                        // Needed to wait for order to be created (Stripe is faster than Thelia)
-                        sleep(5);
-                        /** @var Session $sessionCompleted */
-                        $paymentId = $event->data->object->id;
-                        $this->handlePaymentIntentFail($paymentId, $dispatcher);
+                        // The payment form keeps the buyer on its page after a refusal, to pay the same order
+                        // again with the same PaymentIntent: the order is only cancelled when they give up.
+                        if ($this->isOfThePaymentForm($event->data->object)) {
+                            (new StripePaymentLog())->logText(
+                                sprintf('Payment attempt refused on PaymentIntent %s: the order is left to be paid again.', $event->data->object->id),
+                                StripePaymentLog::INFO
+                            );
+                            break;
+                        }
+
+                        $this->handlePaymentIntentFail($event->data->object->id, $dispatcher);
                         break;
                     default:
                         (new StripePaymentLog())->logText(
@@ -151,16 +155,18 @@ class StripeWebHooksController extends BaseFrontController
         $this->setOrderToCanceled($order, $dispatcher);
     }
 
+    /**
+     * Only the PaymentIntent the module creates for the payment form names its order; the one of a Checkout session
+     * is created by Stripe.
+     */
+    private function isOfThePaymentForm(object $paymentIntent): bool
+    {
+        return '' !== (string) ($paymentIntent->metadata['order_id'] ?? '');
+    }
+
     protected function setOrderToPaid($order, EventDispatcherInterface $dispatcher)
     {
-        $paidStatusId = OrderStatusQuery::create()
-            ->filterByCode('paid')
-            ->select('ID')
-            ->findOne();
-
-        $event = new OrderEvent($order);
-        $event->setStatus($paidStatusId);
-        $dispatcher->dispatch($event, TheliaEvents::ORDER_UPDATE_STATUS);
+        (new OrderConfirmation($dispatcher))->paid($order);
     }
 
     protected function setOrderToCanceled($order, EventDispatcherInterface $dispatcher)

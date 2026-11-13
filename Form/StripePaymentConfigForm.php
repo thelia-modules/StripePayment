@@ -20,7 +20,6 @@ class StripePaymentConfigForm extends BaseStripePaymentConfigForm
         return array(
             "enabled" => $this->translator->trans("Activate payment with stripe ?", [], StripePayment::MESSAGE_DOMAIN),
             "stripe_element" => $this->translator->trans("Activate Element ?", [], StripePayment::MESSAGE_DOMAIN),
-            "one_click_payment" => $this->translator->trans("Activate one click payment ?", [], StripePayment::MESSAGE_DOMAIN),
             "secret_key" => $this->translator->trans("Your secret key", [], StripePayment::MESSAGE_DOMAIN),
             "publishable_key" => $this->translator->trans("Your publishable key (test or live)", [], StripePayment::MESSAGE_DOMAIN),
             "webhooks_key" => $this->translator->trans("Your webhooks key", [], StripePayment::MESSAGE_DOMAIN),

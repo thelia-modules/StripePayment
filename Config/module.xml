@@ -13,7 +13,7 @@
         <language>en_US</language>
         <language>fr_FR</language>
     </languages>
-    <version>5.1.0</version>
+    <version>5.2.0</version>
     <authors>
         <author>
             <name>Etienne Perriere</name>
@@ -21,7 +21,7 @@
         </author>
     </authors>
     <type>payment</type>
-    <thelia>3.0.0</thelia>
+    <thelia>3.3.0</thelia>
     <stability>other</stability>
     <enabled-by-default>0</enabled-by-default>
 </module>
