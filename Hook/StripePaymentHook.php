@@ -2,6 +2,10 @@
 
 namespace StripePayment\Hook;
 
+use Stripe\PaymentIntent;
+use Stripe\Stripe;
+use StripePayment\Classes\StripePaymentLog;
+use StripePayment\Service\CartChargedAmount;
 use StripePayment\StripePayment;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -26,6 +30,7 @@ class StripePaymentHook extends BaseHook
         private readonly RequestStack $requestStack,
         private readonly TaxEngine $taxEngine,
         private readonly CartFacade $cartFacade,
+        private readonly CartChargedAmount $cartChargedAmount,
         ?EventDispatcherInterface $dispatcher = null,
         ?ParserResolver $parserResolver = null,
     ) {
@@ -124,6 +129,15 @@ class StripePaymentHook extends BaseHook
             ((float) $session->getOrder()->getPostage() + $cart->getTaxedAmount($country)) * 100
         );
 
+        // What is left to pay once the instant means of the shop (a credit note, a gift card) have taken their part.
+        // Nothing left for Stripe, or an intent that cannot be brought to that figure: the card fields are not
+        // shown, since they would confirm, in the browser, a payment of another amount.
+        $totalAmount = $this->cartChargedAmount->forStripe($cart, $totalAmount);
+
+        if ($totalAmount <= 0 || !$this->thePaymentIntentCharges($totalAmount, $session)) {
+            return;
+        }
+
         $event->add($this->render(
             'StripePayment/stripe-elements.html.twig',
             [
@@ -137,6 +151,42 @@ class StripePaymentHook extends BaseHook
                 'total_amount' => $totalAmount,
             ]
         ));
+    }
+
+    /**
+     * The intent of the session is created and updated on cart events; a credit note applied since then changes
+     * what is left to pay without any of them. It is brought to the amount shown before the card fields are.
+     */
+    private function thePaymentIntentCharges(int $amount, $session): bool
+    {
+        $paymentIntentId = $session->get(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY);
+        $charged = $session->get(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY);
+
+        if (null === $paymentIntentId) {
+            return true;
+        }
+
+        if (null !== $charged && (int) $charged === $amount) {
+            return true;
+        }
+
+        try {
+            Stripe::setApiKey((string) StripePayment::getConfigValue(StripePayment::SECRET_KEY));
+
+            $paymentIntent = PaymentIntent::update($paymentIntentId, ['amount' => $amount]);
+        } catch (\Exception $exception) {
+            (new StripePaymentLog())->logText(
+                sprintf('The PaymentIntent %s could not be brought to %d: the card fields are not shown. %s', $paymentIntentId, $amount, $exception->getMessage()),
+                StripePaymentLog::ERROR
+            );
+
+            return false;
+        }
+
+        $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, $paymentIntent->client_secret);
+        $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, $amount);
+
+        return true;
     }
 
     public function declareStripeOnClickEvent(HookRenderEvent $event): void

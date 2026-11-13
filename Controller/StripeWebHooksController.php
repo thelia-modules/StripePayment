@@ -160,6 +160,8 @@ class StripeWebHooksController extends BaseFrontController
 
         $event = new OrderEvent($order);
         $event->setStatus($paidStatusId);
+        // Without its source, the core does not settle the part Stripe holds on an order paid in several parts.
+        $event->setSourceModuleCode(StripePayment::getModuleCode());
         $dispatcher->dispatch($event, TheliaEvents::ORDER_UPDATE_STATUS);
     }
 

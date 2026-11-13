@@ -4,6 +4,7 @@ namespace StripePayment\EventListeners;
 
 use Stripe\PaymentIntent;
 use Stripe\Stripe;
+use StripePayment\Service\CartChargedAmount;
 use StripePayment\StripePayment;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -34,14 +35,19 @@ class CartEventListener implements EventSubscriberInterface
     /** @var RequestStack */
     protected $requestStack;
 
+    /** @var CartChargedAmount */
+    protected $cartChargedAmount;
+
     // La requête est résolue à l'appel : le service est construit une seule fois
     // et une capture au constructeur pointerait vers une requête obsolète en mode worker.
     function __construct(
         RequestStack $requestStack,
         EventDispatcherInterface $dispatcher,
-        TaxEngine $taxEngine
+        TaxEngine $taxEngine,
+        CartChargedAmount $cartChargedAmount
     )
     {
+        $this->cartChargedAmount = $cartChargedAmount;
         $this->requestStack = $requestStack;
         $this->dispatcher = $dispatcher;
         $this->taxEngine = $taxEngine;
@@ -105,6 +111,7 @@ class CartEventListener implements EventSubscriberInterface
                 $paymentIntentValues
             );
             $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, $payment->client_secret);
+            $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, $paymentIntentValues['amount']);
 
             return;
         }
@@ -114,6 +121,7 @@ class CartEventListener implements EventSubscriberInterface
 
             $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, $payment->id);
             $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, $payment->client_secret);
+            $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, $paymentIntentValues['amount']);
         } catch (\Exception $exception){
             Tlog::getInstance()->addAlert($exception->getMessage());
         }
@@ -156,8 +164,16 @@ class CartEventListener implements EventSubscriberInterface
             return false;
         }
 
+        // What is left to pay once the instant means of the shop (a credit note, a gift card) have taken their part:
+        // the card fields confirm this intent before the order exists.
+        $amount = $this->cartChargedAmount->forStripe($cart, intval(round($totalAmount)));
+
+        if ($amount <= 0) {
+            return false;
+        }
+
         $values = [
-            'amount' => intval(round($totalAmount)),
+            'amount' => $amount,
             'currency' => strtolower($currency->getCode())
         ];
 

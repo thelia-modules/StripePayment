@@ -6,6 +6,7 @@ use Propel\Runtime\ActiveQuery\Criteria;
 use Propel\Runtime\Connection\ConnectionInterface;
 use StripePayment\Classes\StripePaymentException;
 use StripePayment\Classes\StripePaymentLog;
+use StripePayment\Service\ChargedAmount;
 use Symfony\Component\Config\Definition\Exception\Exception;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -30,14 +31,19 @@ use Thelia\Model\OrderProductQuery;
 use Thelia\Model\ProductImageQuery;
 use Thelia\Model\ProductQuery;
 use Thelia\Module\AbstractPaymentModule;
+use Thelia\Module\BalanceChargingPaymentModuleInterface;
 use Thelia\Tools\URL;
 
 /**
  * Class StripePayment
  * @package StripePayment
  * @author Etienne Perriere - OpenStudio <eperriere@openstudio.fr>
+ *
+ * Charges the balance of an order paid in several parts (BalanceChargingPaymentModuleInterface): the amount sent to
+ * Stripe comes from Service\ChargedAmount for an order and from Service\CartChargedAmount for a cart, never from
+ * Order::getTotalAmount(), and the confirmation of a payment names the module as its source.
  */
-class StripePayment extends AbstractPaymentModule
+class StripePayment extends AbstractPaymentModule implements BalanceChargingPaymentModuleInterface
 {
     const MESSAGE_DOMAIN = "stripepayment";
 
@@ -52,6 +58,8 @@ class StripePayment extends AbstractPaymentModule
     const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
     const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
     const PAYMENT_INTENT_SECRET_SESSION_KEY = 'payment_intent_secret';
+    /** What the PaymentIntent of the session was last asked to charge, in the smallest unit of the currency. */
+    const PAYMENT_INTENT_AMOUNT_SESSION_KEY = 'payment_intent_amount';
 
     const ENABLED = "enabled";
     const STRIPE_ELEMENT = "stripe_element";
@@ -197,11 +205,14 @@ class StripePayment extends AbstractPaymentModule
         try {
 
             if(StripePayment::getConfigValue('stripe_element')){
+                $this->refuseCardFieldsThatDidNotChargeTheBalance($order, $session);
+
                 $order->setTransactionRef($session->get(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY))
                     ->save();
                 $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
                 $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
                 $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
+                $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, null);
 
                 return;
             }
@@ -209,6 +220,7 @@ class StripePayment extends AbstractPaymentModule
             $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
             $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
             $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
+            $session->set(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY, null);
 
             // Create the session on Stripe's servers - this will charge the user's order and save session id into order transaction reference
             return $this->createStripeSession($order);
@@ -249,12 +261,7 @@ class StripePayment extends AbstractPaymentModule
                 self::formatStripeException($e)
             );
 
-            $userMessage = Translator::getInstance()
-                ->trans(
-                    'Invalid parameters were supplied to Stripe.',
-                    [],
-                    StripePayment::MESSAGE_DOMAIN
-                );
+            $userMessage = $this->invalidRequestMessage($e);
         } catch (\Stripe\Exception\AuthenticationException $e) {
             // Authentication with Stripe's API failed
             // (maybe you changed API keys recently)
@@ -299,9 +306,9 @@ class StripePayment extends AbstractPaymentModule
                     StripePayment::MESSAGE_DOMAIN
                 );
         } catch (StripePaymentException $e) {
-            // Amount shown to the user by Stripe & order amount are not equal
+            // The module itself refuses the payment: nothing left to pay, card fields that did not charge the balance
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Amounts are different. %s',
+                'Error paying order %d with Stripe. Payment refused by the module. %s',
                 $order->getId(),
                 self::formatException($e)
             );
@@ -390,13 +397,98 @@ class StripePayment extends AbstractPaymentModule
         );
     }
 
-    public function createStripeSession(OrderModel $order)
+    private function chargedAmount(): ChargedAmount
+    {
+        return new ChargedAmount($this->getDispatcher());
+    }
+
+    /**
+     * The card fields confirm their PaymentIntent in the browser, before the order is placed: it is built from the
+     * cart and brought to the balance by CartEventListener and StripePaymentHook. An order paid in several parts is
+     * tied to that intent only when it charged what the order leaves to pay; anything else is refused, and logged
+     * with the intent so that the merchant can give back what it took.
+     */
+    private function refuseCardFieldsThatDidNotChargeTheBalance(Order $order, $session): void
+    {
+        if (!$this->chargedAmount()->isPaidInParts($order)) {
+            return;
+        }
+
+        $charged = $session->get(StripePayment::PAYMENT_INTENT_AMOUNT_SESSION_KEY);
+        $balance = $this->chargedAmount()->forStripe($order);
+
+        if (null !== $charged && (int) $charged === $balance) {
+            return;
+        }
+
+        (new StripePaymentLog())->logText(
+            sprintf(
+                'Order %d is paid in several parts and leaves %d to pay, but the PaymentIntent %s of the card fields was asked for %s. If it was confirmed, it has to be refunded.',
+                $order->getId(),
+                $balance,
+                (string) $session->get(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY),
+                null === $charged ? 'an unknown amount' : (string) $charged
+            ),
+            StripePaymentLog::ERROR
+        );
+
+        throw new StripePaymentException(Translator::getInstance()
+            ->trans(
+                'The card payment does not match what is left to pay on this order.',
+                [],
+                StripePayment::MESSAGE_DOMAIN
+            )
+        );
+    }
+
+    /**
+     * What the buyer is told when Stripe refuses the request. A balance left by another payment means can fall under
+     * the smallest amount Stripe charges in the currency, which is not a wrong parameter of the shop.
+     */
+    private function invalidRequestMessage(\Stripe\Exception\InvalidRequestException $exception): string
+    {
+        if ('amount_too_small' === $exception->getStripeCode()) {
+            return Translator::getInstance()
+                ->trans(
+                    'The amount left to pay is below what Stripe can charge.',
+                    [],
+                    StripePayment::MESSAGE_DOMAIN
+                );
+        }
+
+        return Translator::getInstance()
+            ->trans(
+                'Invalid parameters were supplied to Stripe.',
+                [],
+                StripePayment::MESSAGE_DOMAIN
+            );
+    }
+
+    /**
+     * What a Stripe Checkout session is created with: a single line holding what the order is charged, with no
+     * detail that could disagree with it.
+     *
+     * @return array<string, mixed>
+     */
+    public function checkoutSessionPayload(OrderModel $order): array
     {
         /* Impossible d'ajouter une ligne spécifique pour la remise, cette partie est mise de côté en attendant que stripe ajoute cette possibilité
 
         $lineItems = $this->prepareLineItems($order);
 
         */
+
+        $amount = $this->chargedAmount()->forStripe($order);
+
+        if ($amount <= 0) {
+            throw new StripePaymentException(Translator::getInstance()
+                ->trans(
+                    'Nothing left to pay on this order.',
+                    [],
+                    StripePayment::MESSAGE_DOMAIN
+                )
+            );
+        }
 
         $currency = $order->getCurrency();
 
@@ -407,7 +499,7 @@ class StripePayment extends AbstractPaymentModule
         $lineItems[] = [
             'price_data' => [
                 'currency' => strtolower($currency->getCode()),
-                'unit_amount' => (int) round($order->getTotalAmount() * 100),
+                'unit_amount' => $amount,
                 'product_data' => [
                     'name' => Translator::getInstance()->trans('Total', [], StripePayment::MESSAGE_DOMAIN ),
                 ]
@@ -419,8 +511,6 @@ class StripePayment extends AbstractPaymentModule
             throw new \Exception("Sorry, your cart is empty. There's nothing to pay.");
         }
 
-        $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
-
         $payload = [
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
@@ -431,7 +521,14 @@ class StripePayment extends AbstractPaymentModule
             'cancel_url' => URL::getInstance()->absoluteUrl('/checkout/failed', ['order_id' => $order->getId()]),
         ];
 
-        $payload = $this->applyPaymentMethodSelection($payload);
+        return $this->applyPaymentMethodSelection($payload);
+    }
+
+    public function createStripeSession(OrderModel $order)
+    {
+        $payload = $this->checkoutSessionPayload($order);
+
+        $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
 
         (new StripePaymentLog())->logText(
             sprintf(
