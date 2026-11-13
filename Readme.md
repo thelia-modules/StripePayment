@@ -65,6 +65,20 @@ in the back-office configuration. To use a Payment Method Configuration created
 in the Dashboard, paste its `pmc_xxx` id in the dedicated field (and leave
 the override empty).
 
+### Paying the balance of an order
+
+Since 5.2 (Thelia 3.3.0 or later), Stripe can pay what is left of an order once
+an instant payment means of the shop, such as a credit note or a gift card, has
+paid a part of it. The Stripe Checkout session is created for that balance.
+
+This holds for both modes. Stripe Checkout creates its session from the order.
+Stripe Elements (the embedded card fields) confirms the payment in the browser,
+before the order is placed: its PaymentIntent is created for what the cart
+leaves to pay and brought to that amount again right before the card fields are
+shown. If the order still leaves another amount to pay than the one charged,
+it is refused, the buyer is sent to the failure page and the PaymentIntent is
+written to the Stripe log so that it can be refunded.
+
 ### Logs
 
 Stripe error logs are stored in a specific file located in the log folder.
