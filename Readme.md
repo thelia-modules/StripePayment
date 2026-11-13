@@ -71,13 +71,43 @@ Since 5.2 (Thelia 3.3.0 or later), Stripe can pay what is left of an order once
 an instant payment means of the shop, such as a credit note or a gift card, has
 paid a part of it. The Stripe Checkout session is created for that balance.
 
-This holds for both modes. Stripe Checkout creates its session from the order.
-Stripe Elements (the embedded card fields) confirms the payment in the browser,
-before the order is placed: its PaymentIntent is created for what the cart
-leaves to pay and brought to that amount again right before the card fields are
-shown. If the order still leaves another amount to pay than the one charged,
-it is refused, the buyer is sent to the failure page and the PaymentIntent is
-written to the Stripe log so that it can be refunded.
+This holds for both modes: the Stripe Checkout session and the PaymentIntent of
+the embedded payment form are both created from the order, for what it leaves
+to pay.
+
+### Stripe Checkout or the embedded payment form
+
+The module pays an order in one of two ways, chosen with the *Activate Element*
+setting.
+
+**Stripe Checkout** (the default). Once the order is placed, the buyer is sent
+to the payment page hosted by Stripe, and comes back to the shop when it is
+done.
+
+**The embedded payment form** (Stripe Elements). Once the order is placed, the
+buyer pays on a page of the shop's own checkout, which holds Stripe's Payment
+Element: cards, Apple Pay, Google Pay and the other payment methods enabled for
+the account, including the ones that need a bank challenge (3-D Secure) or a
+redirection.
+
+- The PaymentIntent is created for the order, and written on it as its
+  transaction reference.
+- A refused payment keeps the buyer on the page, to try again on the same
+  order.
+- The order turns paid as soon as the buyer comes back from a successful
+  payment; the webhook says the same when they never come back (a closed tab).
+- Cancelling the order before it is paid cancels its PaymentIntent, so that a
+  payment confirmed late cannot charge it.
+
+Both modes need the webhook, with the events `checkout.session.completed`,
+`payment_intent.succeeded` and `payment_intent.payment_failed`. The payment
+methods offered by the embedded form follow the same three settings as Stripe
+Checkout (see *Payment methods*).
+
+The page of the embedded form ships for the Flexy front-office theme
+(`templates/frontOffice/flexy/StripePayment/payment.html.twig`). It relies on
+the theme's `checkout_confirm` and `checkout_failed` pages, as every payment
+module does.
 
 ### Logs
 
