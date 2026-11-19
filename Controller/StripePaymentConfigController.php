@@ -41,7 +41,6 @@ class StripePaymentConfigController extends BaseAdminController
             $data = $form->getData();
             StripePayment::setConfigValue(StripePayment::ENABLED, is_bool($data["enabled"]) ? (int) ($data["enabled"]) : $data["enabled"]);
             StripePayment::setConfigValue(StripePayment::STRIPE_ELEMENT, is_bool($data["stripe_element"]) ? (int) ($data["stripe_element"]) : $data["stripe_element"]);
-            StripePayment::setConfigValue(StripePayment::ONE_CLICK_PAYMENT, is_bool($data["one_click_payment"]) ? (int) ($data["one_click_payment"]) : $data["one_click_payment"]);
             StripePayment::setConfigValue(StripePayment::SECRET_KEY, is_bool($data["secret_key"]) ? (int) ($data["secret_key"]) : $data["secret_key"]);
             StripePayment::setConfigValue(StripePayment::PUBLISHABLE_KEY, is_bool($data["publishable_key"]) ? (int) ($data["publishable_key"]) : $data["publishable_key"]);
             StripePayment::setConfigValue(StripePayment::WEBHOOKS_KEY, is_bool($data["webhooks_key"]) ? (int) ($data["webhooks_key"]) : $data["webhooks_key"]);
@@ -66,14 +65,13 @@ class StripePaymentConfigController extends BaseAdminController
                 ->setGeneralError($errorMessage)
             ;
         } else {
-            $context
-                ->set("success", true)
-            ;
-
-            // This controller always redirects back to the configuration screen, and the flag set
-            // above lives on the in-memory ParserContext, which does not survive a redirect. The
-            // success message therefore travels through the session flash bag, read by the hook.
-            $this->getSession()->getFlashBag()->add('stripepayment_success', true);
+            // This controller always redirects back to the configuration screen, so the message
+            // travels through the session flash bag. The back-office layout renders every flash
+            // with its type as the alert class: "success" gives the standard confirmation.
+            $this->getSession()->getFlashBag()->add(
+                'success',
+                Translator::getInstance()->trans('Configuration correctly saved', [], StripePayment::MESSAGE_DOMAIN)
+            );
         }
 
         return $this->generateRedirect(URL::getInstance()->absoluteUrl('/admin/module/StripePayment'));

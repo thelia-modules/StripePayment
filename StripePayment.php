@@ -6,6 +6,9 @@ use Propel\Runtime\ActiveQuery\Criteria;
 use Propel\Runtime\Connection\ConnectionInterface;
 use StripePayment\Classes\StripePaymentException;
 use StripePayment\Classes\StripePaymentLog;
+use StripePayment\Service\ChargedAmount;
+use StripePayment\Service\OrderPaymentIntent;
+use StripePayment\Service\PaymentMethodSelection;
 use Symfony\Component\Config\Definition\Exception\Exception;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -30,14 +33,18 @@ use Thelia\Model\OrderProductQuery;
 use Thelia\Model\ProductImageQuery;
 use Thelia\Model\ProductQuery;
 use Thelia\Module\AbstractPaymentModule;
+use Thelia\Module\BalanceChargingPaymentModuleInterface;
 use Thelia\Tools\URL;
 
 /**
  * Class StripePayment
  * @package StripePayment
  * @author Etienne Perriere - OpenStudio <eperriere@openstudio.fr>
+ *
+ * Charges the balance of an order paid in several parts (BalanceChargingPaymentModuleInterface): the amount sent to
+ * Stripe comes from Service\ChargedAmount, never from Order::getTotalAmount(), and the confirmation of a payment names the module as its source.
  */
-class StripePayment extends AbstractPaymentModule
+class StripePayment extends AbstractPaymentModule implements BalanceChargingPaymentModuleInterface
 {
     const MESSAGE_DOMAIN = "stripepayment";
 
@@ -49,13 +56,15 @@ class StripePayment extends AbstractPaymentModule
     const FRONT_TRANSLATION_DOMAIN = "stripepayment.fo.flexy";
     const CONFIRMATION_MESSAGE_NAME = "stripe_confirm_payment";
 
-    const PAYMENT_INTENT_ID_SESSION_KEY = 'payment_intent_id';
-    const PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY = 'payment_intent_customer_id';
-    const PAYMENT_INTENT_SECRET_SESSION_KEY = 'payment_intent_secret';
+    /** The order the session was sent to the payment form for (Stripe Elements). */
+    const PENDING_ORDER_SESSION_KEY = 'stripe_payment.pending_order_id';
+
+    /** The page that holds the payment form, and the one Stripe sends the buyer back to. */
+    const PAYMENT_PAGE_PATH = '/module/StripePayment/payment';
+    const PAYMENT_RETURN_PATH = '/module/StripePayment/payment/return';
 
     const ENABLED = "enabled";
     const STRIPE_ELEMENT = "stripe_element";
-    const ONE_CLICK_PAYMENT = "one_click_payment";
     const SECRET_KEY = "secret_key";
     const PUBLISHABLE_KEY = "publishable_key";
     const WEBHOOKS_KEY = "webhooks_key";
@@ -196,19 +205,16 @@ class StripePayment extends AbstractPaymentModule
 
         try {
 
-            if(StripePayment::getConfigValue('stripe_element')){
-                $order->setTransactionRef($session->get(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY))
-                    ->save();
-                $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
-                $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
+            if (StripePayment::getConfigValue(self::STRIPE_ELEMENT)) {
+                // The order exists: its PaymentIntent is created for what it leaves to pay, and the buyer is sent
+                // to the page that holds the payment form. A redirection, so that reloading that page asks for
+                // the same order again instead of placing another one.
+                $this->orderPaymentIntent()->createFor($order);
 
-                return;
+                $session->set(self::PENDING_ORDER_SESSION_KEY, $order->getId());
+
+                return new RedirectResponse(URL::getInstance()->absoluteUrl(self::PAYMENT_PAGE_PATH));
             }
-
-            $session->set(StripePayment::PAYMENT_INTENT_ID_SESSION_KEY, null);
-            $session->set(StripePayment::PAYMENT_INTENT_SECRET_SESSION_KEY, null);
-            $session->set(StripePayment::PAYMENT_INTENT_CUSTOMER_ID_SESSION_KEY, null);
 
             // Create the session on Stripe's servers - this will charge the user's order and save session id into order transaction reference
             return $this->createStripeSession($order);
@@ -249,12 +255,7 @@ class StripePayment extends AbstractPaymentModule
                 self::formatStripeException($e)
             );
 
-            $userMessage = Translator::getInstance()
-                ->trans(
-                    'Invalid parameters were supplied to Stripe.',
-                    [],
-                    StripePayment::MESSAGE_DOMAIN
-                );
+            $userMessage = $this->invalidRequestMessage($e);
         } catch (\Stripe\Exception\AuthenticationException $e) {
             // Authentication with Stripe's API failed
             // (maybe you changed API keys recently)
@@ -299,9 +300,9 @@ class StripePayment extends AbstractPaymentModule
                     StripePayment::MESSAGE_DOMAIN
                 );
         } catch (StripePaymentException $e) {
-            // Amount shown to the user by Stripe & order amount are not equal
+            // The module itself refuses the payment: nothing left to pay, card fields that did not charge the balance
             $logMessage = sprintf(
-                'Error paying order %d with Stripe. Amounts are different. %s',
+                'Error paying order %d with Stripe. Payment refused by the module. %s',
                 $order->getId(),
                 self::formatException($e)
             );
@@ -345,28 +346,7 @@ class StripePayment extends AbstractPaymentModule
      */
     private function applyPaymentMethodSelection(array $payload): array
     {
-        $override = trim((string) (StripePayment::getConfigValue(StripePayment::STRIPE_PMC_TYPES_OVERRIDE) ?? ''));
-
-        if ($override !== '') {
-            $types = array_values(array_filter(
-                array_map('trim', explode(',', $override)),
-                static fn (string $type): bool => $type !== ''
-            ));
-
-            if ($types !== []) {
-                $payload['payment_method_types'] = $types;
-
-                return $payload;
-            }
-        }
-
-        $pmcId = trim((string) (StripePayment::getConfigValue(StripePayment::CONFIG_PMC_ID) ?? ''));
-
-        if ($pmcId !== '') {
-            $payload['payment_method_configuration'] = $pmcId;
-        }
-
-        return $payload;
+        return (new PaymentMethodSelection())->applyTo($payload);
     }
 
     private static function formatStripeException(\Stripe\Exception\ApiErrorException $e): string
@@ -390,13 +370,67 @@ class StripePayment extends AbstractPaymentModule
         );
     }
 
-    public function createStripeSession(OrderModel $order)
+    private function chargedAmount(): ChargedAmount
+    {
+        return new ChargedAmount($this->getDispatcher());
+    }
+
+    /**
+     * Read from the container, where a test puts the one that answers in the place of Stripe.
+     */
+    private function orderPaymentIntent(): OrderPaymentIntent
+    {
+        return $this->getContainer()->get(OrderPaymentIntent::class);
+    }
+
+    /**
+     * What the buyer is told when Stripe refuses the request. A balance left by another payment means can fall under
+     * the smallest amount Stripe charges in the currency, which is not a wrong parameter of the shop.
+     */
+    private function invalidRequestMessage(\Stripe\Exception\InvalidRequestException $exception): string
+    {
+        if ('amount_too_small' === $exception->getStripeCode()) {
+            return Translator::getInstance()
+                ->trans(
+                    'The amount left to pay is below what Stripe can charge.',
+                    [],
+                    StripePayment::MESSAGE_DOMAIN
+                );
+        }
+
+        return Translator::getInstance()
+            ->trans(
+                'Invalid parameters were supplied to Stripe.',
+                [],
+                StripePayment::MESSAGE_DOMAIN
+            );
+    }
+
+    /**
+     * What a Stripe Checkout session is created with: a single line holding what the order is charged, with no
+     * detail that could disagree with it.
+     *
+     * @return array<string, mixed>
+     */
+    public function checkoutSessionPayload(OrderModel $order): array
     {
         /* Impossible d'ajouter une ligne spécifique pour la remise, cette partie est mise de côté en attendant que stripe ajoute cette possibilité
 
         $lineItems = $this->prepareLineItems($order);
 
         */
+
+        $amount = $this->chargedAmount()->forStripe($order);
+
+        if ($amount <= 0) {
+            throw new StripePaymentException(Translator::getInstance()
+                ->trans(
+                    'Nothing left to pay on this order.',
+                    [],
+                    StripePayment::MESSAGE_DOMAIN
+                )
+            );
+        }
 
         $currency = $order->getCurrency();
 
@@ -407,7 +441,7 @@ class StripePayment extends AbstractPaymentModule
         $lineItems[] = [
             'price_data' => [
                 'currency' => strtolower($currency->getCode()),
-                'unit_amount' => (int) round($order->getTotalAmount() * 100),
+                'unit_amount' => $amount,
                 'product_data' => [
                     'name' => Translator::getInstance()->trans('Total', [], StripePayment::MESSAGE_DOMAIN ),
                 ]
@@ -419,8 +453,6 @@ class StripePayment extends AbstractPaymentModule
             throw new \Exception("Sorry, your cart is empty. There's nothing to pay.");
         }
 
-        $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
-
         $payload = [
             'customer_email' => $order->getCustomer()->getEmail(),
             'client_reference_id' => $order->getRef(),
@@ -431,7 +463,14 @@ class StripePayment extends AbstractPaymentModule
             'cancel_url' => URL::getInstance()->absoluteUrl('/checkout/failed', ['order_id' => $order->getId()]),
         ];
 
-        $payload = $this->applyPaymentMethodSelection($payload);
+        return $this->applyPaymentMethodSelection($payload);
+    }
+
+    public function createStripeSession(OrderModel $order)
+    {
+        $payload = $this->checkoutSessionPayload($order);
+
+        $stripe = new \Stripe\StripeClient(StripePayment::getConfigValue('secret_key'));
 
         (new StripePaymentLog())->logText(
             sprintf(
@@ -645,5 +684,11 @@ class StripePayment extends AbstractPaymentModule
             ])
             ->autowire(true)
             ->autoconfigure(true);
+
+        // pay() is called on an instance of the module the core builds itself, with the container for only way to a
+        // service: this one has to be readable from it.
+        $servicesConfigurator->set(OrderPaymentIntent::class)
+            ->autowire(true)
+            ->public();
     }
 }

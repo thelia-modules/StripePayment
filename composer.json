@@ -6,6 +6,9 @@
     "thelia/installer": "~1.1",
     "stripe/stripe-php": "^20.0"
   },
+  "conflict": {
+    "thelia/core": "<3.3.0"
+  },
   "extra": {
     "installer-name": "StripePayment"
   }

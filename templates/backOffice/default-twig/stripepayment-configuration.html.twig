@@ -9,10 +9,6 @@
     <div class="card-body">
         <h2 class="h5 mb-3">{{ 'Configure stripepayment'|trans({}, 'stripepayment.bo.default') }}</h2>
 
-        {% if success_message %}
-            <div class="alert alert-success" data-testid="stripepayment-success">{{ success_message }}</div>
-        {% endif %}
-
         {% set form = getForm('stripepayment_config_form') %}
 
         {% form_theme form with bo_form_themes only %}
@@ -44,12 +40,6 @@
                     <div class="form-text">{{ form.stripe_element.vars.label_attr.help|raw }}</div>
                 {% endif %}
                 {{ form_errors(form.stripe_element) }}
-            </div>
-
-            <div class="form-check mb-3">
-                {{ form_widget(form.one_click_payment, { checked: form.one_click_payment.vars.value }) }}
-                <label class="form-check-label" for="{{ form.one_click_payment.vars.id }}">{{ form.one_click_payment.vars.label }}</label>
-                {{ form_errors(form.one_click_payment) }}
             </div>
 
             {% for fieldName in ['secret_key', 'publishable_key', 'webhooks_key', 'secure_url', 'payment_method_types_override', 'payment_method_configuration_id'] %}

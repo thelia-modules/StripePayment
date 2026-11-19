@@ -1,0 +1,60 @@
+{# The page an order is paid on with the embedded payment form (Stripe Elements), served by
+   StripePayment\Controller\StripePaymentController once the order is placed.
+
+   It is a page of the checkout: it extends the theme's checkout layout, and is given the same
+   `steps` and `current` as the theme's own steps.
+
+   Every value the script needs travels as a data attribute: the script is a static module asset
+   with nothing interpolated in it, so the page also works under a strict Content-Security-Policy.
+
+   Left out of Turbo Drive: the form is submitted to Stripe by the script, which then sends the
+   browser to Stripe's return address itself. #}
+{% extends 'checkout-base.html.twig' %}
+
+{% block title %}{{ 'Payment'|stripepayment_trans }}{% endblock %}
+
+{% block checkoutContent %}
+    <div class="StripePaymentForm"
+         data-turbo="false"
+         data-stripe-payment
+         data-stripe-public-key="{{ public_key }}"
+         data-stripe-client-secret="{{ client_secret }}"
+         data-stripe-return-url="{{ return_url }}"
+         data-stripe-locale="{{ stripe_locale }}"
+         data-stripe-unavailable-message="{{ 'The payment form could not be loaded. Please reload the page.'|stripepayment_trans }}">
+        <h1 class="h4 mb-6">{{ 'Pay your order %ref%'|stripepayment_trans({'%ref%': order_ref}) }}</h1>
+
+        {% if declined %}
+            <div class="SnackBar bg-error-lightest border-error SnackBar--error mb-6" role="alert">
+                <div class="SnackBar-content">
+                    <div class="SnackBar-message">
+                        {{ 'The payment was not accepted. You can try again, with the same or another payment method.'|stripepayment_trans }}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <form data-stripe-payment-form novalidate>
+            {# Filled in by Stripe.js. #}
+            <div class="StripePaymentForm-element" data-stripe-payment-element></div>
+
+            <div class="SnackBar bg-error-lightest border-error SnackBar--error StripePaymentForm-error" data-stripe-payment-error role="alert" hidden>
+                <div class="SnackBar-content">
+                    <div class="SnackBar-message" data-stripe-payment-error-message></div>
+                </div>
+            </div>
+
+            {# Disabled until the form is ready, and again while Stripe is asked: one click, one payment. #}
+            {{ component('Molecules:Button:Base', {
+                text: 'Pay %amount%'|stripepayment_trans({'%amount%': amount}),
+                size: 'large',
+                type: 'submit',
+                class: 'StripePaymentForm-submit',
+                'data-stripe-payment-submit': true,
+                disabled: true,
+            }) }}
+        </form>
+    </div>
+
+    <script src="{{ module_asset('StripePayment', 'StripePayment/assets/js/stripe-elements.js') }}"></script>
+{% endblock %}

@@ -50,7 +50,6 @@ class StripePaymentConfigForm extends BaseForm
 
         $this->addEnabledField($translationKeys, $fieldsIdKeys);
         $this->addStripeElementField($translationKeys, $fieldsIdKeys);
-        $this->addOneClickPaymentField($translationKeys, $fieldsIdKeys);
         $this->addSecretKeyField($translationKeys, $fieldsIdKeys);
         $this->addPublishableKeyField($translationKeys, $fieldsIdKeys);
         $this->addWebhooksKeyField($translationKeys, $fieldsIdKeys);
@@ -89,22 +88,6 @@ class StripePaymentConfigForm extends BaseForm
                 "constraints" => array(
                 ),
                 "value" => StripePayment::getConfigValue(StripePayment::STRIPE_ELEMENT, false),
-            ))
-        ;
-    }
-
-    protected function addOneClickPaymentField(array $translationKeys, array $fieldsIdKeys)
-    {
-        $this->formBuilder
-            ->add("one_click_payment", CheckboxType::class, array(
-                "label" => $this->readKey("one_click_payment", $translationKeys),
-                "label_attr" => [
-                    "for" => $this->readKey("one_click_payment", $fieldsIdKeys)
-                ],
-                "required" => false,
-                "constraints" => array(
-                ),
-                "value" => StripePayment::getConfigValue(StripePayment::ONE_CLICK_PAYMENT, false),
             ))
         ;
     }
